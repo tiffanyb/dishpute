@@ -1,6 +1,6 @@
 # Dishpute: Product and System Architecture
 
-Status: Initial design draft
+Status: Approved initial architecture; database implementation in progress
 
 ## 1. Product purpose
 
@@ -35,11 +35,15 @@ Examples:
 
 A Task has its own lifecycle, such as active, completed, or cancelled. Whether it has been scheduled should normally be derived from its active Time Block relationships instead of being mixed into the lifecycle status.
 
+A Task may contain Subtasks to any depth. Every Subtask is also a Task, and a Task may have no more than one direct parent. The hierarchy may not contain cycles. Completing all Subtasks does not automatically complete their parent; a member must explicitly complete the parent Task.
+
 ### Time Block
 
 A Time Block represents reserved or actual household-work time. It is a first-class entity with its own identity, participant, start and end times, status, and lifecycle.
 
 A Time Block may contain zero, one, or multiple Tasks. It may be created as a general household-work reservation before the household decides what work will happen during that period.
+
+Tasks and Time Blocks may each include multiple participating Household members.
 
 ### Task and Time Block relationship
 
@@ -65,9 +69,15 @@ A Task Instance represents one concrete occurrence of a Task, especially for rec
 
 A Completion Record captures what actually happened. Planned time and actual work should remain distinguishable so that the system can support planning without requiring perfect real-time tracking.
 
+A Completion Record may include multiple participants. Each participant receives the full effective duration as their individual contribution. For example, two members working together for 60 minutes produce 120 total person-minutes.
+
+Actual duration is normally calculated from start and end times. A manually entered duration overrides the calculated duration.
+
 ### Household and membership
 
 Every household-owned record must belong to a Household. Users gain access through Household Membership rather than through direct database access.
+
+Every Household has an editable default timezone used for calendar interpretation and date-based reporting.
 
 ## 4. Initial data entities
 
@@ -84,7 +94,7 @@ The initial relational model is expected to include:
 - `completion_records`
 - `audit_events`
 
-Exact columns, constraints, indexes, and retention rules remain to be designed.
+Python SQLAlchemy models are the readable source of truth for tables, fields, and relationships. Alembic migrations apply those models to PostgreSQL. Small PostgreSQL-specific protections and reporting views may remain in migrations when the ORM cannot express them directly. Operational retention rules remain deferred until deployment planning.
 
 ## 5. Privacy and sharing model
 
@@ -213,6 +223,11 @@ Future versions may allow each Household to select or configure a fairness polic
 - Record creation follows the rules in Section 9.
 - The initial fairness measurement is each member's total completed duration within a selected time period.
 - Fairness policy is kept separate from the underlying household-work records so it can evolve and eventually vary by Household.
+- Tasks support a recursive parent and Subtask hierarchy, and parent completion is always explicit.
+- Tasks, Time Blocks, and completed-work sessions may have multiple participants.
+- Each participant in a completed-work session receives its full effective duration as contribution.
+- A Household has an editable default timezone.
+- Actual duration is calculated from start and end times unless a manual override is provided.
 - MCP may create new Tasks planned for any member of the caller's Household and may record work completed by any member without explicit confirmation.
 - Active Household members may update shared Household records through MCP regardless of who created them.
 - Household membership cannot be managed through MCP.

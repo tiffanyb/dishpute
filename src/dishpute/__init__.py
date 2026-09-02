@@ -1,0 +1,2 @@
+"""Dishpute application package."""
+
