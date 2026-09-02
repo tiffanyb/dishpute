@@ -2,8 +2,11 @@ import os
 from collections.abc import Iterator
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+from dishpute.api import app, get_session
 
 
 DATABASE_URL = os.environ.get(
@@ -26,4 +29,15 @@ def session() -> Iterator[Session]:
         transaction.rollback()
         connection.close()
         engine.dispose()
+
+
+@pytest.fixture
+def api_client(session: Session) -> Iterator[TestClient]:
+    def override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = override_session
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.clear()
 
