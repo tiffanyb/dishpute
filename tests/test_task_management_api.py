@@ -4,7 +4,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from dishpute.models import AppUser, AuditEvent, Household, HouseholdMembership, Task, TimeBlock
+from dishpute.models import (
+    AppUser,
+    AuditEvent,
+    Household,
+    HouseholdMembership,
+    IntegrationRequest,
+    Task,
+    TimeBlock,
+)
 
 
 def create_family(
@@ -156,6 +164,15 @@ def test_member_can_edit_schedule_reschedule_and_cancel_shared_task_time(
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
+    response_statuses = list(
+        session.scalars(
+            select(IntegrationRequest.response_status)
+            .where(IntegrationRequest.household_id == household.id)
+            .order_by(IntegrationRequest.created_at, IntegrationRequest.operation)
+        )
+    )
+    assert response_statuses.count(201) == 2
+    assert response_statuses.count(200) == 3
 
     unscheduled_tasks = api_client.get(
         f"/households/{household.id}/tasks",

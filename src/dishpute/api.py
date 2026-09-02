@@ -230,7 +230,6 @@ def schedule_task_route(
             operation=f"schedule_task:{task_id}",
             payload=payload,
             response_model=TaskTimeBlockResponse,
-            response_status=200,
             action=lambda: _time_block_response(
                 schedule_task(
                     session,
@@ -267,6 +266,7 @@ def update_time_block_route(
             operation=f"update_time_block:{time_block_id}",
             payload=payload,
             response_model=TaskTimeBlockResponse,
+            response_status=200,
             action=lambda: _time_block_response(
                 update_planned_time_block(
                     session,
