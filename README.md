@@ -27,7 +27,12 @@ The readable database definition is [the SQLAlchemy model file](src/dishpute/mod
 
 ## Application API
 
-Start the local API with `make api-dev`, then open `http://127.0.0.1:8000/docs` for the interactive API contract.
+Start the local server with `make api-dev`. Open `http://127.0.0.1:8000/` for the
+Dishpute web app or `http://127.0.0.1:8000/docs` for the interactive API contract.
+
+Until OAuth is implemented, the web app's connection dialog accepts a local Household
+ID and User ID. It stores them in browser-local storage and sends the same temporary
+`X-Actor-User-Id` header used by the API documentation.
 
 The initial routes are:
 

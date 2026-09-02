@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f7f4" />
+    <title>Dishpute</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">D</div>
+        <div>
+          <h1>Dishpute</h1>
+          <p id="household-label">Shared household time</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="member-legend" id="member-legend"></div>
+        <button class="icon-button" id="refresh-button" type="button" title="Refresh">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+        <button class="profile-button" id="connection-button" type="button">
+          <span class="profile-initial" id="profile-initial">?</span>
+          <span id="profile-name">Connect</span>
+          <i data-lucide="chevron-down"></i>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <nav class="view-tabs" aria-label="Main views">
+        <button class="view-tab active" data-view="calendar" type="button">
+          <i data-lucide="calendar-days"></i>
+          Calendar
+        </button>
+        <button class="view-tab" data-view="tasks" type="button">
+          <i data-lucide="list-checks"></i>
+          Tasks
+        </button>
+      </nav>
+
+      <section class="view active" id="calendar-view">
+        <div class="view-toolbar">
+          <div>
+            <p class="section-kicker">Weekly plan</p>
+            <h2 id="week-title">This week</h2>
+          </div>
+          <div class="date-controls">
+            <button class="text-button" id="today-button" type="button">Today</button>
+            <div class="button-group">
+              <button class="icon-button" id="previous-week" type="button" title="Previous week">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button class="icon-button" id="next-week" type="button" title="Next week">
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+      </section>
+
+      <section class="view" id="tasks-view">
+        <div class="view-toolbar">
+          <div>
+            <p class="section-kicker">Everything visible</p>
+            <h2>Household work</h2>
+          </div>
+          <div class="segmented-control" id="task-filters" aria-label="Filter work items">
+            <button class="active" data-filter="all" type="button">All</button>
+            <button data-filter="active" type="button">Active</button>
+            <button data-filter="completed" type="button">Completed</button>
+          </div>
+        </div>
+        <div class="task-summary" id="task-summary"></div>
+        <div class="task-list" id="task-list"></div>
+      </section>
+
+      <section class="empty-state hidden" id="connection-empty-state">
+        <i data-lucide="users"></i>
+        <h2>Connect your household</h2>
+        <p>Enter the local Household and User IDs to load your shared plan.</p>
+        <button class="primary-button" id="empty-connect-button" type="button">Connect</button>
+      </section>
+    </main>
+
+    <dialog id="connection-dialog">
+      <form method="dialog" id="connection-form">
+        <div class="dialog-header">
+          <div>
+            <p class="section-kicker">Local development</p>
+            <h2>Connect to Dishpute</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit" title="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <label>
+          Household ID
+          <input id="household-id" name="household-id" autocomplete="off" required />
+        </label>
+        <label>
+          Your User ID
+          <input id="user-id" name="user-id" autocomplete="off" required />
+        </label>
+        <p class="dialog-note">OAuth sign-in will replace these IDs before public deployment.</p>
+        <div class="dialog-actions">
+          <button class="text-button" value="cancel" type="submit">Cancel</button>
+          <button class="primary-button" id="save-connection" value="default" type="submit">
+            Connect
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="item-dialog">
+      <div class="dialog-header">
+        <div>
+          <p class="section-kicker" id="item-dialog-kicker">Work item</p>
+          <h2 id="item-dialog-title"></h2>
+        </div>
+        <button class="icon-button" id="close-item-dialog" type="button" title="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <dl class="item-details" id="item-details"></dl>
+    </dialog>
+
+    <div class="toast hidden" id="toast" role="status"></div>
+  </body>
+</html>

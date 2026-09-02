@@ -1,11 +1,13 @@
 import os
 from collections.abc import Iterator
 from datetime import date, datetime
+from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from dishpute.database import build_engine, build_session_factory
@@ -70,6 +72,8 @@ DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
 app = FastAPI(title="Dishpute API", version="0.1.0")
+WEB_ROOT = Path(__file__).with_name("web")
+app.mount("/assets", StaticFiles(directory=WEB_ROOT), name="assets")
 
 
 def _transaction(session: Session):
@@ -151,6 +155,11 @@ def handle_natural_language_error(_request: Request, error: NaturalLanguageError
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+def web_app() -> FileResponse:
+    return FileResponse(WEB_ROOT / "index.html")
 
 
 @app.get(
