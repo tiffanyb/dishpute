@@ -103,3 +103,9 @@ completed work, create and update Tasks, schedule or move Time Blocks, explicitl
 complete Tasks, and read the Calendar and unified work-item feed. Local IDs in
 environment variables are temporary; the remote gateway will derive member context
 from OAuth instead.
+
+## Deployment
+
+The production container and private-server Compose configuration are documented in
+[the deployment guide](docs/deployment.md). Public MCP must remain disabled until its
+OAuth issuer and callback URLs are configured for the final HTTPS domain.
