@@ -23,10 +23,10 @@ complete.
 - [x] Select zero, one, or multiple planned participants.
 - [ ] Optionally schedule a Time Block while creating a Task.
 - [ ] Create a Subtask beneath an existing Task.
-- [ ] Open a complete Task detail view.
+- [x] Open a complete Task detail view.
 - [ ] Edit Task content, scope, and planned participants.
-- [ ] Explicitly complete, reopen, or cancel a Task.
-- [ ] Preserve completed and cancelled Tasks in history.
+- [x] Explicitly complete, reopen, or cancel a Task.
+- [x] Preserve completed and cancelled Tasks in history.
 - [ ] Display recursive Subtasks as a navigable hierarchy.
 
 ### Time Blocks

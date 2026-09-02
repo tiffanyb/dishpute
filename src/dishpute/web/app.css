@@ -146,6 +146,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 32px 48px; }
 .invite-panel strong { display: block; margin-top: 5px; overflow-wrap: anywhere; }
 
 dialog { width: min(480px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 8px; padding: 22px; box-shadow: 0 24px 70px rgba(28,33,27,.2); }
+.wide-dialog { width: min(620px, calc(100vw - 32px)); }
 dialog::backdrop { background: rgba(24,28,23,.38); backdrop-filter: blur(2px); }
 .dialog-header { justify-content: space-between; margin-bottom: 24px; }
 dialog label { display: block; margin-top: 14px; color: var(--muted); font-size: 12px; font-weight: 700; }
@@ -176,6 +177,14 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .item-details { display: grid; grid-template-columns: 120px 1fr; gap: 13px; margin: 0; }
 .item-details dt { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .item-details dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.task-description { margin: -8px 0 22px; color: var(--muted); line-height: 1.55; }
+.detail-section { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.detail-section h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.detail-empty { color: var(--muted); font-size: 12px; }
+.detail-row { padding: 9px 0; border-bottom: 1px solid #e8eae6; font-size: 12px; }
+.detail-row:last-child { border-bottom: 0; }
+.danger-button { color: var(--coral); margin-right: auto; }
+.task-lifecycle-actions { border-top: 1px solid var(--line); padding-top: 16px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 360px; padding: 12px 16px; background: var(--ink); color: white; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 12px; z-index: 30; }
 
 @media (max-width: 900px) {

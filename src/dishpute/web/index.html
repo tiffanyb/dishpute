@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.7" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.8" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.7" defer></script>
+    <script src="/assets/app.js?v=20260902.8" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -231,6 +231,27 @@
           <button class="primary-button" id="save-task-button" type="submit">Create task</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="task-detail-dialog" class="wide-dialog">
+      <div class="dialog-header">
+        <div><p class="section-kicker">Task</p><h2 id="task-detail-title"></h2></div>
+        <button class="icon-button" id="close-task-detail" type="button" title="Close"><i data-lucide="x"></i></button>
+      </div>
+      <p class="task-description" id="task-detail-description"></p>
+      <dl class="item-details" id="task-detail-metadata"></dl>
+      <section class="detail-section">
+        <h3>Reserved time</h3><div id="task-detail-time-blocks"></div>
+      </section>
+      <section class="detail-section">
+        <h3>Subtasks</h3><div id="task-detail-subtasks"></div>
+      </section>
+      <p class="form-error hidden" id="task-detail-error" role="alert"></p>
+      <div class="dialog-actions task-lifecycle-actions">
+        <button class="text-button danger-button" id="cancel-task-button" type="button">Cancel task</button>
+        <button class="text-button" id="reopen-task-button" type="button">Reopen</button>
+        <button class="primary-button" id="complete-task-button" type="button"><i data-lucide="check"></i>Complete</button>
+      </div>
     </dialog>
 
     <div class="toast hidden" id="toast" role="status"></div>

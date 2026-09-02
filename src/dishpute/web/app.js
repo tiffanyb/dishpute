@@ -10,6 +10,7 @@ const state = {
   weekStart: startOfWeek(new Date()),
   activeView: "calendar",
   taskFilter: "all",
+  selectedTaskId: null,
 };
 
 const memberColors = ["#28644c", "#c9563f", "#426b8a", "#a77718", "#77578c"];
@@ -184,7 +185,11 @@ function renderTasks() {
   const completedCount = state.workItems.filter((item) => item.status === "completed").length;
   $("#task-summary").innerHTML = `<span><strong class="summary-value">${activeCount}</strong> active</span><span><strong class="summary-value">${completedCount}</strong> completed</span><span><strong class="summary-value">${state.workItems.length}</strong> total</span>`;
   $("#task-list").innerHTML = visible.length ? visible.map(taskItemMarkup).join("") : '<div class="list-empty">No work matches this view.</div>';
-  $$(".task-row").forEach((button) => button.addEventListener("click", () => openItem("work", button.dataset.id)));
+  $$(".task-row").forEach((button) => button.addEventListener("click", () => {
+    const item = state.workItems.find((entry) => entry.id === button.dataset.id);
+    if (item?.item_type === "task") openTaskDetail(item.id);
+    else openItem("work", button.dataset.id);
+  }));
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -269,6 +274,49 @@ function openItem(type, id) {
   if (item.counts_toward_fairness !== null && item.counts_toward_fairness !== undefined) rows.push(["Fairness", item.counts_toward_fairness ? "Included" : "Not included"]);
   $("#item-details").innerHTML = rows.map(([label, value]) => `<dt>${label}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
   $("#item-dialog").showModal();
+}
+
+async function openTaskDetail(taskId) {
+  try {
+    const task = await api(`/households/${state.householdId}/tasks/${taskId}`);
+    state.selectedTaskId = task.id;
+    $("#task-detail-title").textContent = task.title;
+    $("#task-detail-description").textContent = task.description || "No description";
+    const creator = memberById(task.created_by_user_id)?.display_name || "Household member";
+    $("#task-detail-metadata").innerHTML = [
+      ["Status", task.lifecycle_status], ["Created by", creator],
+      ["Planned with", participantNames(task.participant_user_ids)],
+      ["Category", task.category], ["Scope", task.work_scope],
+    ].map(([label, value]) => `<dt>${label}</dt><dd>${escapeHtml(value)}</dd>`).join("");
+    $("#task-detail-time-blocks").innerHTML = task.time_blocks.length
+      ? task.time_blocks.map((block) => `<div class="detail-row">${new Date(block.starts_at).toLocaleString()} – ${new Date(block.ends_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>`).join("")
+      : '<div class="detail-empty">No time reserved yet.</div>';
+    $("#task-detail-subtasks").innerHTML = task.subtasks.length
+      ? task.subtasks.map((subtask) => `<div class="detail-row">${escapeHtml(subtask.title)} · ${escapeHtml(subtask.lifecycle_status)}</div>`).join("")
+      : '<div class="detail-empty">No subtasks yet.</div>';
+    $("#complete-task-button").classList.toggle("hidden", task.lifecycle_status !== "active");
+    $("#cancel-task-button").classList.toggle("hidden", task.lifecycle_status !== "active");
+    $("#reopen-task-button").classList.toggle("hidden", task.lifecycle_status === "active");
+    $("#task-detail-error").classList.add("hidden");
+    $("#task-detail-dialog").showModal();
+  } catch (error) { showToast(error.message); }
+}
+
+async function updateSelectedTaskLifecycle(lifecycleStatus) {
+  const errorElement = $("#task-detail-error");
+  errorElement.classList.add("hidden");
+  try {
+    await api(`/households/${state.householdId}/tasks/${state.selectedTaskId}/lifecycle`, {
+      method: "PATCH", idempotentWrite: true,
+      body: JSON.stringify({ lifecycle_status: lifecycleStatus }),
+    });
+    $("#task-detail-dialog").close();
+    await loadAll();
+    showToast(`Task ${lifecycleStatus}`);
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  }
 }
 
 function showConnectionState() {
@@ -446,6 +494,12 @@ function bindEvents() {
   $("#close-task-create").addEventListener("click", () => $("#task-create-dialog").close());
   $("#cancel-task-create").addEventListener("click", () => $("#task-create-dialog").close());
   $("#task-create-form").addEventListener("submit", createTask);
+  $("#close-task-detail").addEventListener("click", () => $("#task-detail-dialog").close());
+  $("#complete-task-button").addEventListener("click", () => updateSelectedTaskLifecycle("completed"));
+  $("#reopen-task-button").addEventListener("click", () => updateSelectedTaskLifecycle("active"));
+  $("#cancel-task-button").addEventListener("click", () => {
+    if (window.confirm("Cancel this Task? Its history will be preserved.")) updateSelectedTaskLifecycle("cancelled");
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
