@@ -31,12 +31,18 @@ The readable database definition is [the SQLAlchemy model file](src/dishpute/mod
 Start the local server with `make api-dev`. Open `http://127.0.0.1:8000/` for the
 Dishpute web app or `http://127.0.0.1:8000/docs` for the interactive API contract.
 
-Until OAuth is implemented, the web app's connection dialog accepts a local Household
-ID and User ID. It stores them in browser-local storage and sends the same temporary
-`X-Actor-User-Id` header used by the API documentation.
+The API supports email signup and login with Argon2 password hashing, bearer sessions,
+household creation, and expiring single-use household invitations. The current web
+connection dialog still uses local IDs; its sign-in experience is the next UI step.
 
 The initial routes are:
 
+- `POST /auth/signup`
+- `POST /auth/login`
+- `GET /me`
+- `POST /households`
+- `POST /households/{household_id}/invites`
+- `POST /households/join`
 - `POST /households/{household_id}/tasks`
 - `GET /households/{household_id}/tasks`
 - `GET /households/{household_id}/tasks/{task_id}`
@@ -67,7 +73,10 @@ phrases for completed work, planned work, and unscheduled Tasks. It is an early
 end-to-end test surface, not yet a general AI interpreter. A model-backed interpreter
 can replace it without changing the Application API's household rules.
 
-During this first development stage, the authenticated caller is represented by the `X-Actor-User-Id` header. OAuth will replace this temporary mechanism before the API is publicly exposed.
+Authenticated calls use `Authorization: Bearer <session-token>`. The temporary
+`X-Actor-User-Id` development header remains enabled by default for local fixtures and
+can be disabled with `DISHPUTE_ALLOW_DEV_ACTOR_HEADER=false`. It must be disabled on a
+public deployment. OAuth will protect the remote MCP endpoint separately.
 
 Every write also requires an `Idempotency-Key` header. Retrying the same request with
 the same key returns the original response without creating duplicate records. A key

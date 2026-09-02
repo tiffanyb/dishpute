@@ -75,6 +75,41 @@ class AuthIdentity(Base):
     )
 
 
+class PasswordCredential(TimestampMixin, Base):
+    __tablename__ = "password_credentials"
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("app_users.id", ondelete="CASCADE"), primary_key=True
+    )
+    email: Mapped[str] = mapped_column(Text, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="password_credentials_email_lowercase"),
+        CheckConstraint("length(trim(email)) > 3", name="password_credentials_email_present"),
+        CheckConstraint(
+            "length(password_hash) > 20", name="password_credentials_password_hash_present"
+        ),
+    )
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("app_users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+    __table_args__ = (Index("auth_sessions_user_id_idx", "user_id"),)
+
+
 class Household(TimestampMixin, Base):
     __tablename__ = "households"
 
@@ -118,6 +153,37 @@ class HouseholdMembership(Base):
             "(status = 'inactive' AND left_at IS NOT NULL)",
             name="membership_status_matches_left_at",
         ),
+    )
+
+
+class HouseholdInvite(Base):
+    __tablename__ = "household_invites"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    household_id: Mapped[UUID] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("app_users.id"), nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("app_users.id"))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["household_id", "created_by_user_id"],
+            ["household_memberships.household_id", "household_memberships.user_id"],
+            name="household_invites_creator_membership_fkey",
+        ),
+        CheckConstraint(
+            "(used_at IS NULL AND used_by_user_id IS NULL) OR "
+            "(used_at IS NOT NULL AND used_by_user_id IS NOT NULL)",
+            name="household_invites_usage_matches",
+        ),
+        Index("household_invites_household_id_idx", "household_id"),
     )
 
 

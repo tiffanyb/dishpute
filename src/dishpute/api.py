@@ -1,27 +1,53 @@
 import os
+import secrets
 from collections.abc import Iterator
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, Query, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from dishpute.auth import (
+    AuthenticationError,
+    authenticate_password,
+    create_session,
+    development_headers_enabled,
+    digest_secret,
+    normalize_email,
+    password_hash,
+    resolve_bearer_token,
+)
 from dishpute.database import build_engine, build_session_factory
 from dishpute.idempotency import execute_idempotent
-from dishpute.models import Household
+from dishpute.models import (
+    AppUser,
+    Household,
+    HouseholdInvite,
+    HouseholdMembership,
+    PasswordCredential,
+)
 from dishpute.natural_language import NaturalLanguageError, interpret
 from dishpute.schemas import (
+    AuthResponse,
     CalendarItemResponse,
     CompletedWorkCreate,
     CompletedWorkResponse,
     ContributionResponse,
+    HouseholdCreate,
     HouseholdMemberResponse,
+    HouseholdResponse,
+    InviteAccept,
+    InviteResponse,
+    LoginCreate,
     NaturalLanguageCreate,
     NaturalLanguageResponse,
+    SignUpCreate,
     TaskCreate,
     TaskDetailResponse,
     TaskLifecycleUpdate,
@@ -66,9 +92,27 @@ def get_session() -> Iterator[Session]:
         yield session
 
 
-ActorUserId = Annotated[UUID, Header(alias="X-Actor-User-Id")]
 IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 DatabaseSession = Annotated[Session, Depends(get_session)]
+
+
+def get_actor_user_id(
+    session: DatabaseSession,
+    authorization: Annotated[str | None, Header()] = None,
+    development_actor_id: Annotated[UUID | None, Header(alias="X-Actor-User-Id")] = None,
+) -> UUID:
+    try:
+        bearer_user_id = resolve_bearer_token(session, authorization)
+    except AuthenticationError as error:
+        raise HTTPException(status_code=401, detail=str(error)) from error
+    if bearer_user_id is not None:
+        return bearer_user_id
+    if development_actor_id is not None and development_headers_enabled():
+        return development_actor_id
+    raise HTTPException(status_code=401, detail="Authentication required")
+
+
+ActorUserId = Annotated[UUID, Depends(get_actor_user_id)]
 
 
 app = FastAPI(title="Dishpute API", version="0.1.0")
@@ -155,6 +199,141 @@ def handle_natural_language_error(_request: Request, error: NaturalLanguageError
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def signup(payload: SignUpCreate, session: DatabaseSession) -> AuthResponse:
+    email = normalize_email(payload.email)
+    if "@" not in email:
+        raise HTTPException(status_code=422, detail="Enter a valid email address")
+    try:
+        with _transaction(session):
+            user = AppUser(display_name=payload.display_name)
+            session.add(user)
+            session.flush()
+            session.add(
+                PasswordCredential(
+                    user_id=user.id,
+                    email=email,
+                    password_hash=password_hash.hash(payload.password),
+                )
+            )
+            token, _record = create_session(session, user.id)
+    except IntegrityError as error:
+        raise HTTPException(status_code=409, detail="An account already uses this email") from error
+    return AuthResponse(access_token=token, user_id=user.id, display_name=user.display_name)
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+def login(payload: LoginCreate, session: DatabaseSession) -> AuthResponse:
+    try:
+        with _transaction(session):
+            user_id = authenticate_password(session, payload.email, payload.password)
+            user = session.get(AppUser, user_id)
+            token, _record = create_session(session, user_id)
+    except AuthenticationError as error:
+        raise HTTPException(status_code=401, detail=str(error)) from error
+    assert user is not None
+    return AuthResponse(access_token=token, user_id=user.id, display_name=user.display_name)
+
+
+@app.get("/me")
+def current_user(actor_user_id: ActorUserId, session: DatabaseSession) -> dict[str, object]:
+    user = session.get(AppUser, actor_user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    households = session.scalars(
+        select(Household)
+        .join(HouseholdMembership)
+        .where(
+            HouseholdMembership.user_id == actor_user_id,
+            HouseholdMembership.status == "active",
+        )
+        .order_by(Household.name)
+    ).all()
+    return {
+        "user_id": user.id,
+        "display_name": user.display_name,
+        "households": [
+            {
+                "id": household.id,
+                "name": household.name,
+                "default_timezone": household.default_timezone,
+            }
+            for household in households
+        ],
+    }
+
+
+@app.post("/households", response_model=HouseholdResponse, status_code=status.HTTP_201_CREATED)
+def create_household_route(
+    payload: HouseholdCreate,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> HouseholdResponse:
+    with _transaction(session):
+        household = Household(
+            name=payload.name,
+            default_timezone=payload.default_timezone,
+            created_by_user_id=actor_user_id,
+        )
+        household.memberships.append(
+            HouseholdMembership(user_id=actor_user_id, role="administrator")
+        )
+        session.add(household)
+        session.flush()
+    return HouseholdResponse.model_validate(household, from_attributes=True)
+
+
+@app.post("/households/{household_id}/invites", response_model=InviteResponse)
+def create_household_invite(
+    household_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> InviteResponse:
+    membership = session.get(HouseholdMembership, (household_id, actor_user_id))
+    if membership is None or membership.status != "active":
+        raise HTTPException(status_code=404, detail="Household not found")
+    code = secrets.token_urlsafe(24)
+    with _transaction(session):
+        invite = HouseholdInvite(
+            household_id=household_id,
+            created_by_user_id=actor_user_id,
+            code_hash=digest_secret(code),
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+        session.add(invite)
+        session.flush()
+    return InviteResponse(invite_code=code, expires_at=invite.expires_at)
+
+
+@app.post("/households/join", response_model=HouseholdResponse)
+def join_household(
+    payload: InviteAccept,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> HouseholdResponse:
+    invite = session.scalar(
+        select(HouseholdInvite).where(
+            HouseholdInvite.code_hash == digest_secret(payload.invite_code)
+        )
+    )
+    if invite is None or invite.used_at is not None or invite.expires_at <= datetime.now(UTC):
+        raise HTTPException(status_code=404, detail="Invitation is invalid or expired")
+    with _transaction(session):
+        existing = session.get(HouseholdMembership, (invite.household_id, actor_user_id))
+        if existing is None:
+            session.add(
+                HouseholdMembership(household_id=invite.household_id, user_id=actor_user_id)
+            )
+        elif existing.status != "active":
+            existing.status = "active"
+            existing.left_at = None
+        invite.used_by_user_id = actor_user_id
+        invite.used_at = datetime.now(UTC)
+        household = session.get(Household, invite.household_id)
+    assert household is not None
+    return HouseholdResponse.model_validate(household, from_attributes=True)
 
 
 @app.get("/", include_in_schema=False)

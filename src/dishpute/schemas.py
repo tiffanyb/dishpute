@@ -9,6 +9,44 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class SignUpCreate(ApiModel):
+    display_name: str = Field(min_length=1, max_length=100)
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=10, max_length=200)
+
+
+class LoginCreate(ApiModel):
+    email: str = Field(min_length=5, max_length=320)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class AuthResponse(ApiModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    user_id: UUID
+    display_name: str
+
+
+class HouseholdCreate(ApiModel):
+    name: str = Field(min_length=1, max_length=100)
+    default_timezone: str = Field(default="UTC", min_length=1, max_length=100)
+
+
+class HouseholdResponse(ApiModel):
+    id: UUID
+    name: str
+    default_timezone: str
+
+
+class InviteResponse(ApiModel):
+    invite_code: str
+    expires_at: datetime
+
+
+class InviteAccept(ApiModel):
+    invite_code: str = Field(min_length=20, max_length=200)
+
+
 class TaskCreate(ApiModel):
     title: str = Field(min_length=1)
     description: str | None = None
