@@ -25,6 +25,21 @@ before Uvicorn starts and exposes `/health` for monitoring.
 For a private Tailscale-only deployment, set `BIND_ADDRESS` to the server's Tailscale
 IPv4 address. Do not set it to `0.0.0.0` unless a host firewall restricts access.
 
+To make the same deployment available through Tailscale Serve HTTPS, include the
+Tailscale Compose override. It adds a loopback listener without removing the existing
+private-address listener used by nginx:
+
+```bash
+docker compose \
+  -f compose.production.yaml \
+  -f compose.tailscale.yaml \
+  up -d --build
+tailscale serve --bg 8000
+```
+
+Tailscale Serve provisions and renews HTTPS for the machine's private `*.ts.net`
+hostname. It does not issue a certificate for a custom hostname.
+
 The production configuration disables `X-Actor-User-Id`. Browser access therefore
 requires a real bearer session created through Dishpute signup or login.
 
