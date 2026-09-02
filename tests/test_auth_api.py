@@ -28,6 +28,7 @@ def test_members_can_create_and_join_a_household(api_client, session: Session) -
     )
     assert created.status_code == 201
     household = created.json()
+    assert session.in_transaction() is False
 
     invitation = api_client.post(
         f"/households/{household['id']}/invites",

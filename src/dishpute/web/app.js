@@ -272,13 +272,21 @@ function showAuthError(message) {
 async function createHousehold() {
   const form = $("#create-household-form");
   if (!form.reportValidity()) return;
+  const button = $("#create-household-button");
+  button.disabled = true;
+  button.textContent = "Creating...";
   try {
     const household = await api("/households", { method: "POST", body: JSON.stringify({ name: $("#household-name").value, default_timezone: $("#household-timezone").value }) });
     state.householdId = household.id;
     localStorage.setItem("dishpute.householdId", household.id);
     $("#household-dialog").close();
     await bootstrap();
-  } catch (error) { showToast(error.message); }
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Could not create the household");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create household";
+  }
 }
 
 async function joinHousehold() {

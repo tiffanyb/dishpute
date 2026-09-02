@@ -1,6 +1,7 @@
 import os
 import secrets
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
@@ -120,8 +121,14 @@ WEB_ROOT = Path(__file__).with_name("web")
 app.mount("/assets", StaticFiles(directory=WEB_ROOT), name="assets")
 
 
+@contextmanager
 def _transaction(session: Session):
-    return session.begin_nested() if session.in_transaction() else session.begin()
+    try:
+        yield
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
 
 def _task_summary(result: ListedTask) -> TaskSummary:
