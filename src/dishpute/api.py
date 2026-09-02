@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response, status
@@ -19,15 +19,30 @@ from dishpute.schemas import (
     NaturalLanguageCreate,
     NaturalLanguageResponse,
     TaskCreate,
+    TaskDetailResponse,
+    TaskLifecycleUpdate,
     TaskResponse,
+    TaskScheduleCreate,
+    TaskSummary,
+    TaskTimeBlockResponse,
+    TaskUpdate,
+    TimeBlockUpdate,
 )
 from dishpute.services import (
     ApplicationError,
+    ListedTask,
+    ListedTimeBlock,
+    TaskDetails,
     create_task,
+    get_task_details,
     list_contributions,
+    list_tasks,
     record_completed_work,
+    schedule_task,
+    update_planned_time_block,
+    update_task,
+    update_task_lifecycle,
 )
-
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -43,13 +58,55 @@ def get_session() -> Iterator[Session]:
 
 
 ActorUserId = Annotated[UUID, Header(alias="X-Actor-User-Id")]
-IdempotencyKey = Annotated[
-    str, Header(alias="Idempotency-Key", min_length=1, max_length=200)
-]
+IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
 app = FastAPI(title="Dishpute API", version="0.1.0")
+
+
+def _transaction(session: Session):
+    return session.begin_nested() if session.in_transaction() else session.begin()
+
+
+def _task_summary(result: ListedTask) -> TaskSummary:
+    return TaskSummary(
+        id=result.task.id,
+        title=result.task.title,
+        category=result.task.category,
+        lifecycle_status=result.task.lifecycle_status,
+        parent_task_id=result.task.parent_task_id,
+        participant_user_ids=result.participant_user_ids,
+        scheduled=result.scheduled,
+    )
+
+
+def _time_block_response(result: ListedTimeBlock) -> TaskTimeBlockResponse:
+    return TaskTimeBlockResponse(
+        id=result.time_block.id,
+        title=result.time_block.title,
+        starts_at=result.time_block.starts_at,
+        ends_at=result.time_block.ends_at,
+        status=result.time_block.status,
+        participant_user_ids=result.participant_user_ids,
+    )
+
+
+def _task_detail(result: TaskDetails) -> TaskDetailResponse:
+    return TaskDetailResponse(
+        **_task_summary(
+            ListedTask(
+                task=result.task,
+                participant_user_ids=result.participant_user_ids,
+                scheduled=result.scheduled,
+            )
+        ).model_dump(),
+        household_id=result.task.household_id,
+        created_by_user_id=result.task.created_by_user_id,
+        description=result.task.description,
+        subtasks=[_task_summary(subtask) for subtask in result.subtasks],
+        time_blocks=[_time_block_response(block) for block in result.time_blocks],
+    )
 
 
 @app.exception_handler(ApplicationError)
@@ -58,15 +115,207 @@ def handle_application_error(_request: Request, error: ApplicationError) -> JSON
 
 
 @app.exception_handler(NaturalLanguageError)
-def handle_natural_language_error(
-    _request: Request, error: NaturalLanguageError
-) -> JSONResponse:
+def handle_natural_language_error(_request: Request, error: NaturalLanguageError) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": str(error)})
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get(
+    "/households/{household_id}/tasks",
+    response_model=list[TaskSummary],
+)
+def list_tasks_route(
+    household_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+    lifecycle_status: Annotated[Literal["active", "completed", "cancelled"] | None, Query()] = None,
+    schedule_status: Annotated[Literal["scheduled", "unscheduled"] | None, Query()] = None,
+    participant_user_id: Annotated[UUID | None, Query()] = None,
+) -> list[TaskSummary]:
+    with _transaction(session):
+        results = list_tasks(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            lifecycle_status=lifecycle_status,
+            schedule_status=schedule_status,
+            participant_user_id=participant_user_id,
+        )
+    return [_task_summary(result) for result in results]
+
+
+@app.get(
+    "/households/{household_id}/tasks/{task_id}",
+    response_model=TaskDetailResponse,
+)
+def get_task_route(
+    household_id: UUID,
+    task_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> TaskDetailResponse:
+    with _transaction(session):
+        result = _task_detail(
+            get_task_details(
+                session,
+                household_id=household_id,
+                actor_user_id=actor_user_id,
+                task_id=task_id,
+            )
+        )
+    return result
+
+
+@app.patch(
+    "/households/{household_id}/tasks/{task_id}",
+    response_model=TaskDetailResponse,
+)
+def update_task_route(
+    household_id: UUID,
+    task_id: UUID,
+    payload: TaskUpdate,
+    actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+    response: Response,
+) -> TaskDetailResponse:
+    with _transaction(session):
+        result, replayed = execute_idempotent(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            operation=f"update_task:{task_id}",
+            payload=payload,
+            response_model=TaskDetailResponse,
+            response_status=200,
+            action=lambda: _task_detail(
+                update_task(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    task_id=task_id,
+                    changes=payload.model_dump(exclude_unset=True),
+                )
+            ),
+        )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
+
+
+@app.post(
+    "/households/{household_id}/tasks/{task_id}/time-blocks",
+    response_model=TaskTimeBlockResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def schedule_task_route(
+    household_id: UUID,
+    task_id: UUID,
+    payload: TaskScheduleCreate,
+    actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+    response: Response,
+) -> TaskTimeBlockResponse:
+    with _transaction(session):
+        result, replayed = execute_idempotent(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            operation=f"schedule_task:{task_id}",
+            payload=payload,
+            response_model=TaskTimeBlockResponse,
+            response_status=200,
+            action=lambda: _time_block_response(
+                schedule_task(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    task_id=task_id,
+                    **payload.model_dump(),
+                )
+            ),
+        )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
+
+
+@app.patch(
+    "/households/{household_id}/time-blocks/{time_block_id}",
+    response_model=TaskTimeBlockResponse,
+)
+def update_time_block_route(
+    household_id: UUID,
+    time_block_id: UUID,
+    payload: TimeBlockUpdate,
+    actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+    response: Response,
+) -> TaskTimeBlockResponse:
+    with _transaction(session):
+        result, replayed = execute_idempotent(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            operation=f"update_time_block:{time_block_id}",
+            payload=payload,
+            response_model=TaskTimeBlockResponse,
+            action=lambda: _time_block_response(
+                update_planned_time_block(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    time_block_id=time_block_id,
+                    changes=payload.model_dump(exclude_unset=True),
+                )
+            ),
+        )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
+
+
+@app.patch(
+    "/households/{household_id}/tasks/{task_id}/lifecycle",
+    response_model=TaskDetailResponse,
+)
+def update_task_lifecycle_route(
+    household_id: UUID,
+    task_id: UUID,
+    payload: TaskLifecycleUpdate,
+    actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+    response: Response,
+) -> TaskDetailResponse:
+    with _transaction(session):
+        result, replayed = execute_idempotent(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            operation=f"update_task_lifecycle:{task_id}",
+            payload=payload,
+            response_model=TaskDetailResponse,
+            response_status=200,
+            action=lambda: _task_detail(
+                update_task_lifecycle(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    task_id=task_id,
+                    lifecycle_status=payload.lifecycle_status,
+                )
+            ),
+        )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
 
 
 @app.post(
@@ -82,7 +331,7 @@ def natural_language_route(
     session: DatabaseSession,
     response: Response,
 ) -> NaturalLanguageResponse:
-    with session.begin():
+    with _transaction(session):
         household = session.get(Household, household_id)
         if household is None:
             raise ApplicationError("Household was not found")
@@ -107,9 +356,7 @@ def natural_language_route(
                 )
                 completed_work = CompletedWorkResponse(
                     completion_record_id=result.completion.id,
-                    time_block_id=(
-                        result.time_block.id if result.time_block is not None else None
-                    ),
+                    time_block_id=(result.time_block.id if result.time_block is not None else None),
                     task_id=result.completion.task_id,
                     participant_user_ids=result.participant_user_ids,
                     effective_duration_minutes=result.effective_duration_minutes,
@@ -125,9 +372,7 @@ def natural_language_route(
                 actor_user_id=actor_user_id,
                 title=command.title,
                 category=command.category,
-                participant_user_ids=(
-                    [actor_user_id] if command.started_at is not None else []
-                ),
+                participant_user_ids=([actor_user_id] if command.started_at is not None else []),
                 parent_task_id=payload.parent_task_id,
                 scheduled_start=command.started_at,
                 scheduled_end=command.ended_at,
@@ -141,9 +386,7 @@ def natural_language_route(
                 lifecycle_status=result.task.lifecycle_status,
                 parent_task_id=result.task.parent_task_id,
                 participant_user_ids=result.participant_user_ids,
-                time_block_id=(
-                    result.time_block.id if result.time_block is not None else None
-                ),
+                time_block_id=(result.time_block.id if result.time_block is not None else None),
             )
             return NaturalLanguageResponse(interpreted_action=command.action, task=task)
 
@@ -174,7 +417,8 @@ def create_task_route(
     session: DatabaseSession,
     response: Response,
 ) -> TaskResponse:
-    with session.begin():
+    with _transaction(session):
+
         def perform_action() -> TaskResponse:
             created = create_task(
                 session,
@@ -191,9 +435,7 @@ def create_task_route(
                 lifecycle_status=created.task.lifecycle_status,
                 parent_task_id=created.task.parent_task_id,
                 participant_user_ids=created.participant_user_ids,
-                time_block_id=(
-                    created.time_block.id if created.time_block is not None else None
-                ),
+                time_block_id=(created.time_block.id if created.time_block is not None else None),
             )
 
         result, replayed = execute_idempotent(
@@ -223,7 +465,8 @@ def record_completed_work_route(
     session: DatabaseSession,
     response: Response,
 ) -> CompletedWorkResponse:
-    with session.begin():
+    with _transaction(session):
+
         def perform_action() -> CompletedWorkResponse:
             recorded = record_completed_work(
                 session,
@@ -233,9 +476,7 @@ def record_completed_work_route(
             )
             return CompletedWorkResponse(
                 completion_record_id=recorded.completion.id,
-                time_block_id=(
-                    recorded.time_block.id if recorded.time_block is not None else None
-                ),
+                time_block_id=(recorded.time_block.id if recorded.time_block is not None else None),
                 task_id=recorded.completion.task_id,
                 participant_user_ids=recorded.participant_user_ids,
                 effective_duration_minutes=recorded.effective_duration_minutes,
@@ -266,11 +507,12 @@ def list_contributions_route(
     start_date: Annotated[date | None, Query()] = None,
     end_date: Annotated[date | None, Query()] = None,
 ) -> list[ContributionResponse]:
-    contributions = list_contributions(
-        session,
-        household_id=household_id,
-        actor_user_id=actor_user_id,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    with _transaction(session):
+        contributions = list_contributions(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
     return [ContributionResponse(**contribution.__dict__) for contribution in contributions]

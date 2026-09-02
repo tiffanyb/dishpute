@@ -42,6 +42,85 @@ class TaskResponse(ApiModel):
     time_block_id: UUID | None
 
 
+class TaskSummary(ApiModel):
+    id: UUID
+    title: str
+    category: str
+    lifecycle_status: str
+    parent_task_id: UUID | None
+    participant_user_ids: list[UUID]
+    scheduled: bool
+
+
+class TaskTimeBlockResponse(ApiModel):
+    id: UUID
+    title: str | None
+    starts_at: datetime
+    ends_at: datetime
+    status: str
+    participant_user_ids: list[UUID]
+
+
+class TaskDetailResponse(TaskSummary):
+    household_id: UUID
+    created_by_user_id: UUID
+    description: str | None
+    subtasks: list[TaskSummary]
+    time_blocks: list[TaskTimeBlockResponse]
+
+
+class TaskUpdate(ApiModel):
+    title: str | None = Field(default=None, min_length=1)
+    description: str | None = None
+    category: str | None = Field(default=None, min_length=1)
+    participant_user_ids: list[UUID] | None = None
+
+    @model_validator(mode="after")
+    def validate_non_null_fields(self) -> "TaskUpdate":
+        provided = self.model_fields_set
+        if "title" in provided and self.title is None:
+            raise ValueError("title cannot be null")
+        if "category" in provided and self.category is None:
+            raise ValueError("category cannot be null")
+        if not provided:
+            raise ValueError("at least one Task field must be provided")
+        return self
+
+
+class TaskScheduleCreate(ApiModel):
+    starts_at: datetime
+    ends_at: datetime
+    participant_user_ids: list[UUID] | None = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "TaskScheduleCreate":
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class TimeBlockUpdate(ApiModel):
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    status: str | None = Field(default=None, pattern="^(planned|cancelled)$")
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> "TimeBlockUpdate":
+        if not self.model_fields_set:
+            raise ValueError("at least one Time Block field must be provided")
+        if (
+            self.starts_at is not None
+            and self.ends_at is not None
+            and self.ends_at <= self.starts_at
+        ):
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class TaskLifecycleUpdate(ApiModel):
+    lifecycle_status: str = Field(pattern="^(active|completed|cancelled)$")
+
+
 class CompletedWorkCreate(ApiModel):
     category: str = Field(default="other", min_length=1)
     description: str | None = None

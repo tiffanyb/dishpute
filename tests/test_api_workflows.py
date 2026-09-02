@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -78,9 +77,7 @@ def test_tiffany_records_kitchen_work_that_just_happened(
     assert contributions.json()[0]["user_id"] == str(tiffany.id)
 
 
-def test_husband_plans_future_kitchen_work(
-    api_client: TestClient, session: Session
-) -> None:
+def test_husband_plans_future_kitchen_work(api_client: TestClient, session: Session) -> None:
     household, _, husband = create_family(session)
 
     response = api_client.post(
@@ -323,9 +320,7 @@ def test_idempotency_key_cannot_be_reused_for_different_content(
     assert session.scalar(select(func.count()).select_from(Task)) == 1
 
 
-def test_write_requires_an_idempotency_key(
-    api_client: TestClient, session: Session
-) -> None:
+def test_write_requires_an_idempotency_key(api_client: TestClient, session: Session) -> None:
     household, tiffany, _ = create_family(session)
 
     response = api_client.post(

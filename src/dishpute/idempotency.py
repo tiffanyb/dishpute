@@ -2,7 +2,6 @@ import hashlib
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -12,8 +11,6 @@ from sqlalchemy.orm import Session
 from dishpute.models import IntegrationRequest
 from dishpute.services import ConflictError
 
-
-ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
 CLIENT_NAME = "dishpute-application-api"
 
 
@@ -26,7 +23,7 @@ def _request_hash(operation: str, payload: BaseModel) -> str:
     return hashlib.sha256(canonical_request.encode()).hexdigest()
 
 
-def execute_idempotent(
+def execute_idempotent[ResponseModel: BaseModel](
     session: Session,
     *,
     household_id: UUID,
@@ -36,6 +33,7 @@ def execute_idempotent(
     payload: BaseModel,
     response_model: type[ResponseModel],
     action: Callable[[], ResponseModel],
+    response_status: int = 201,
 ) -> tuple[ResponseModel, bool]:
     normalized_key = idempotency_key.strip()
     request_hash = _request_hash(operation, payload)
@@ -58,9 +56,7 @@ def execute_idempotent(
             or existing.operation != operation
             or existing.request_hash != request_hash
         ):
-            raise ConflictError(
-                "This Idempotency-Key was already used for a different request"
-            )
+            raise ConflictError("This Idempotency-Key was already used for a different request")
         if existing.response_body is None or existing.response_status is None:
             raise ConflictError("The original request has not finished")
         return response_model.model_validate(existing.response_body), True
@@ -74,7 +70,7 @@ def execute_idempotent(
             idempotency_key=normalized_key,
             operation=operation,
             request_hash=request_hash,
-            response_status=201,
+            response_status=response_status,
             response_body=response.model_dump(mode="json"),
             completed_at=datetime.now(UTC),
         )

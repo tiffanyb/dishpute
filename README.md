@@ -32,9 +32,20 @@ Start the local API with `make api-dev`, then open `http://127.0.0.1:8000/docs` 
 The initial routes are:
 
 - `POST /households/{household_id}/tasks`
+- `GET /households/{household_id}/tasks`
+- `GET /households/{household_id}/tasks/{task_id}`
+- `PATCH /households/{household_id}/tasks/{task_id}`
+- `POST /households/{household_id}/tasks/{task_id}/time-blocks`
+- `PATCH /households/{household_id}/time-blocks/{time_block_id}`
+- `PATCH /households/{household_id}/tasks/{task_id}/lifecycle`
 - `POST /households/{household_id}/completed-work`
 - `POST /households/{household_id}/natural-language`
 - `GET /households/{household_id}/contributions`
+
+Task listing can be filtered by lifecycle, scheduled or unscheduled state, and
+participant. Task details include direct Subtasks, participants, and linked Time
+Blocks. Cancelling a planned Time Block leaves its Task available for rescheduling,
+and Task completion or reopening is always explicit.
 
 The natural-language route currently recognizes a deliberately small set of English
 phrases for completed work, planned work, and unscheduled Tasks. It is an early

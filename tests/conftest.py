@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from dishpute.api import app, get_session
 
-
 DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql+psycopg://dishpute:dishpute-local-only@127.0.0.1:5432/dishpute_python_test",
