@@ -91,8 +91,9 @@ def test_members_can_list_and_inspect_shared_task_hierarchy(
     assert details.json()["subtasks"] == [
         {
             "id": child["id"],
-            "title": "Plan the meal",
-            "category": "other",
+                "title": "Plan the meal",
+                "category": "other",
+                "work_scope": "household",
             "lifecycle_status": "active",
             "parent_task_id": parent["id"],
             "participant_user_ids": [],

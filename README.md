@@ -41,11 +41,20 @@ The initial routes are:
 - `POST /households/{household_id}/completed-work`
 - `POST /households/{household_id}/natural-language`
 - `GET /households/{household_id}/contributions`
+- `GET /households/{household_id}/members`
+- `GET /households/{household_id}/calendar-items`
+- `GET /households/{household_id}/work-items`
 
 Task listing can be filtered by lifecycle, scheduled or unscheduled state, and
 participant. Task details include direct Subtasks, participants, and linked Time
 Blocks. Cancelling a planned Time Block leaves its Task available for rescheduling,
 and Task completion or reopening is always explicit.
+
+Calendar items provide planned and completed Time Blocks over a requested date range.
+The unified work-item feed contains both Tasks and completed work, allowing completed
+work to appear in the Tasks tab without creating a fake future Task. Work may be
+scoped as `household` or `personal`; personal completed work defaults to not counting
+toward household fairness.
 
 The natural-language route currently recognizes a deliberately small set of English
 phrases for completed work, planned work, and unscheduled Tasks. It is an early

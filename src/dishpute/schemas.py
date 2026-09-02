@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -12,6 +13,7 @@ class TaskCreate(ApiModel):
     title: str = Field(min_length=1)
     description: str | None = None
     category: str = Field(default="other", min_length=1)
+    work_scope: Literal["household", "personal"] = "household"
     participant_user_ids: list[UUID] = Field(default_factory=list)
     parent_task_id: UUID | None = None
     scheduled_start: datetime | None = None
@@ -36,6 +38,7 @@ class TaskResponse(ApiModel):
     title: str
     description: str | None
     category: str
+    work_scope: str
     lifecycle_status: str
     parent_task_id: UUID | None
     participant_user_ids: list[UUID]
@@ -46,6 +49,7 @@ class TaskSummary(ApiModel):
     id: UUID
     title: str
     category: str
+    work_scope: str
     lifecycle_status: str
     parent_task_id: UUID | None
     participant_user_ids: list[UUID]
@@ -58,6 +62,7 @@ class TaskTimeBlockResponse(ApiModel):
     starts_at: datetime
     ends_at: datetime
     status: str
+    work_scope: str
     participant_user_ids: list[UUID]
 
 
@@ -73,6 +78,7 @@ class TaskUpdate(ApiModel):
     title: str | None = Field(default=None, min_length=1)
     description: str | None = None
     category: str | None = Field(default=None, min_length=1)
+    work_scope: Literal["household", "personal"] | None = None
     participant_user_ids: list[UUID] | None = None
 
     @model_validator(mode="after")
@@ -82,6 +88,8 @@ class TaskUpdate(ApiModel):
             raise ValueError("title cannot be null")
         if "category" in provided and self.category is None:
             raise ValueError("category cannot be null")
+        if "work_scope" in provided and self.work_scope is None:
+            raise ValueError("work_scope cannot be null")
         if not provided:
             raise ValueError("at least one Task field must be provided")
         return self
@@ -123,6 +131,8 @@ class TaskLifecycleUpdate(ApiModel):
 
 class CompletedWorkCreate(ApiModel):
     category: str = Field(default="other", min_length=1)
+    work_scope: Literal["household", "personal"] | None = None
+    counts_toward_fairness: bool | None = None
     description: str | None = None
     participant_user_ids: list[UUID] = Field(min_length=1)
     started_at: datetime | None = None
@@ -154,6 +164,8 @@ class CompletedWorkResponse(ApiModel):
     task_id: UUID | None
     participant_user_ids: list[UUID]
     effective_duration_minutes: int
+    work_scope: str
+    counts_toward_fairness: bool
 
 
 class ContributionResponse(ApiModel):
@@ -172,3 +184,38 @@ class NaturalLanguageResponse(ApiModel):
     interpreted_action: str
     task: TaskResponse | None = None
     completed_work: CompletedWorkResponse | None = None
+
+
+class HouseholdMemberResponse(ApiModel):
+    user_id: UUID
+    display_name: str
+
+
+class CalendarItemResponse(ApiModel):
+    id: UUID
+    item_type: Literal["planned", "completed"]
+    title: str | None
+    category: str
+    work_scope: str
+    status: str
+    starts_at: datetime
+    ends_at: datetime
+    participant_user_ids: list[UUID]
+    task_ids: list[UUID]
+    completion_record_id: UUID | None
+    counts_toward_fairness: bool | None
+
+
+class WorkItemResponse(ApiModel):
+    id: UUID
+    item_type: Literal["task", "completed_work"]
+    title: str
+    category: str
+    work_scope: str
+    status: str
+    participant_user_ids: list[UUID]
+    parent_task_id: UUID | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    duration_minutes: int | None = None
+    counts_toward_fairness: bool | None = None

@@ -6,6 +6,7 @@ from sqlalchemy import delete, exists, select, text
 from sqlalchemy.orm import Session
 
 from dishpute.models import (
+    AppUser,
     AuditEvent,
     CompletionRecord,
     CompletionRecordParticipant,
@@ -78,6 +79,37 @@ class TaskDetails:
     time_blocks: list[ListedTimeBlock]
 
 
+@dataclass(frozen=True)
+class HouseholdMember:
+    user_id: UUID
+    display_name: str
+
+
+@dataclass(frozen=True)
+class CalendarItem:
+    time_block: TimeBlock
+    category: str
+    participant_user_ids: list[UUID]
+    task_ids: list[UUID]
+    completion: CompletionRecord | None
+
+
+@dataclass(frozen=True)
+class WorkItem:
+    id: UUID
+    item_type: str
+    title: str
+    category: str
+    work_scope: str
+    status: str
+    participant_user_ids: list[UUID]
+    parent_task_id: UUID | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    duration_minutes: int | None = None
+    counts_toward_fairness: bool | None = None
+
+
 def _require_active_membership(session: Session, household_id: UUID, user_id: UUID) -> None:
     membership = session.get(HouseholdMembership, (household_id, user_id))
     if membership is None or membership.status != "active":
@@ -144,6 +176,19 @@ def _time_block_participant_ids(session: Session, time_block_id: UUID) -> list[U
     )
 
 
+def _completion_participant_ids(session: Session, completion_id: UUID) -> list[UUID]:
+    return list(
+        session.scalars(
+            select(CompletionRecordParticipant.user_id)
+            .where(CompletionRecordParticipant.completion_record_id == completion_id)
+            .order_by(
+                CompletionRecordParticipant.created_at,
+                CompletionRecordParticipant.user_id,
+            )
+        )
+    )
+
+
 def _task_is_scheduled(session: Session, task_id: UUID) -> bool:
     return bool(
         session.scalar(
@@ -191,6 +236,7 @@ def create_task(
     title: str,
     description: str | None = None,
     category: str = "other",
+    work_scope: str = "household",
     participant_user_ids: list[UUID] | None = None,
     parent_task_id: UUID | None = None,
     scheduled_start: datetime | None = None,
@@ -210,6 +256,7 @@ def create_task(
         title=title.strip(),
         description=description,
         category=category.strip(),
+        work_scope=work_scope,
     )
     session.add(task)
     session.flush()
@@ -244,6 +291,7 @@ def create_task(
             block_kind="planned",
             status="planned",
             title=task.title,
+            work_scope=task.work_scope,
             starts_at=scheduled_start,
             ends_at=scheduled_end,
         )
@@ -380,7 +428,7 @@ def update_task(
     before_values: dict[str, object] = {}
     after_values: dict[str, object] = {}
 
-    for field in ("title", "description", "category"):
+    for field in ("title", "description", "category", "work_scope"):
         if field in changes:
             value = changes[field]
             if isinstance(value, str):
@@ -449,6 +497,7 @@ def schedule_task(
         block_kind="planned",
         status="planned",
         title=task.title,
+        work_scope=task.work_scope,
         starts_at=starts_at,
         ends_at=ends_at,
     )
@@ -575,6 +624,8 @@ def record_completed_work(
     started_at: datetime | None,
     ended_at: datetime | None,
     duration_override_minutes: int | None,
+    work_scope: str | None = None,
+    counts_toward_fairness: bool | None = None,
     task_id: UUID | None = None,
     complete_task: bool = False,
 ) -> RecordedWork:
@@ -584,6 +635,12 @@ def record_completed_work(
         raise ApplicationError("Completed work requires at least one participant")
 
     task = _find_task(session, household_id, task_id) if task_id is not None else None
+    resolved_work_scope = work_scope or (task.work_scope if task is not None else "household")
+    resolved_fairness = (
+        counts_toward_fairness
+        if counts_toward_fairness is not None
+        else resolved_work_scope == "household"
+    )
     time_block = None
     if started_at is not None and ended_at is not None:
         time_block = TimeBlock(
@@ -592,6 +649,7 @@ def record_completed_work(
             block_kind="actual",
             status="completed",
             title=description,
+            work_scope=resolved_work_scope,
             starts_at=started_at,
             ends_at=ended_at,
         )
@@ -621,6 +679,8 @@ def record_completed_work(
         task_id=task.id if task is not None else None,
         time_block_id=time_block.id if time_block is not None else None,
         category=category.strip(),
+        work_scope=resolved_work_scope,
+        counts_toward_fairness=resolved_fairness,
         description=description,
         duration_override_minutes=duration_override_minutes,
         started_at=started_at,
@@ -673,6 +733,129 @@ def record_completed_work(
         time_block=time_block,
         effective_duration_minutes=completion.effective_duration_minutes,
     )
+
+
+def list_household_members(
+    session: Session, *, household_id: UUID, actor_user_id: UUID
+) -> list[HouseholdMember]:
+    _require_active_membership(session, household_id, actor_user_id)
+    rows = session.execute(
+        select(AppUser.id, AppUser.display_name)
+        .join(HouseholdMembership, HouseholdMembership.user_id == AppUser.id)
+        .where(
+            HouseholdMembership.household_id == household_id,
+            HouseholdMembership.status == "active",
+        )
+        .order_by(AppUser.display_name, AppUser.id)
+    )
+    return [HouseholdMember(user_id=row.id, display_name=row.display_name) for row in rows]
+
+
+def list_calendar_items(
+    session: Session,
+    *,
+    household_id: UUID,
+    actor_user_id: UUID,
+    starts_before: datetime,
+    ends_after: datetime,
+) -> list[CalendarItem]:
+    _require_active_membership(session, household_id, actor_user_id)
+    if starts_before <= ends_after:
+        raise ApplicationError("Calendar range end must be after its start")
+    blocks = list(
+        session.scalars(
+            select(TimeBlock)
+            .where(
+                TimeBlock.household_id == household_id,
+                TimeBlock.starts_at < starts_before,
+                TimeBlock.ends_at > ends_after,
+            )
+            .order_by(TimeBlock.starts_at, TimeBlock.id)
+        )
+    )
+    results: list[CalendarItem] = []
+    for block in blocks:
+        task_ids = list(
+            session.scalars(
+                select(TimeBlockTask.task_id)
+                .where(TimeBlockTask.time_block_id == block.id)
+                .order_by(TimeBlockTask.sort_order, TimeBlockTask.task_id)
+            )
+        )
+        completion = session.scalar(
+            select(CompletionRecord)
+            .where(CompletionRecord.time_block_id == block.id)
+            .order_by(CompletionRecord.created_at, CompletionRecord.id)
+            .limit(1)
+        )
+        category = completion.category if completion is not None else "other"
+        if completion is None and task_ids:
+            linked_task = session.get(Task, task_ids[0])
+            if linked_task is not None:
+                category = linked_task.category
+        results.append(
+            CalendarItem(
+                time_block=block,
+                category=category,
+                participant_user_ids=_time_block_participant_ids(session, block.id),
+                task_ids=task_ids,
+                completion=completion,
+            )
+        )
+    return results
+
+
+def list_work_items(
+    session: Session,
+    *,
+    household_id: UUID,
+    actor_user_id: UUID,
+) -> list[WorkItem]:
+    _require_active_membership(session, household_id, actor_user_id)
+    tasks = list(
+        session.scalars(
+            select(Task)
+            .where(Task.household_id == household_id)
+            .order_by(Task.created_at.desc(), Task.id)
+        )
+    )
+    completions = list(
+        session.scalars(
+            select(CompletionRecord)
+            .where(CompletionRecord.household_id == household_id)
+            .order_by(CompletionRecord.completed_at.desc(), CompletionRecord.id)
+        )
+    )
+    task_items = [
+        WorkItem(
+            id=task.id,
+            item_type="task",
+            title=task.title,
+            category=task.category,
+            work_scope=task.work_scope,
+            status=task.lifecycle_status,
+            participant_user_ids=_task_participant_ids(session, task.id),
+            parent_task_id=task.parent_task_id,
+        )
+        for task in tasks
+    ]
+    completion_items = [
+        WorkItem(
+            id=completion.id,
+            item_type="completed_work",
+            title=completion.description or "Completed work",
+            category=completion.category,
+            work_scope=completion.work_scope,
+            status="completed",
+            participant_user_ids=_completion_participant_ids(session, completion.id),
+            starts_at=completion.started_at,
+            ends_at=completion.ended_at,
+            duration_minutes=completion.effective_duration_minutes,
+            counts_toward_fairness=completion.counts_toward_fairness,
+        )
+        for completion in completions
+    ]
+    return task_items + completion_items
 
 
 def list_contributions(

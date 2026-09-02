@@ -106,6 +106,12 @@ The Household is the sharing and authorization boundary.
 - Records from one Household must never be visible to members of another Household.
 - All completed household work contributes to that Household's fairness statistics.
 
+Work purpose is separate from visibility. `household` work normally contributes to
+fairness. `personal` work is still shared within the Household for calendar and
+work-life-balance visibility, but does not contribute by default. A Completion Record
+stores the explicit fairness-inclusion decision so history remains stable if the
+default policy changes later.
+
 Privacy efforts therefore focus on protecting the Household from outside access, including other households, unauthenticated users, infrastructure operators, and unnecessary third-party disclosure.
 
 ## 6. System boundaries
@@ -116,6 +122,7 @@ The target architecture separates domain behavior from clients and integrations:
 Web App -------------------------------> Dishpute Application API ---> PostgreSQL
 Codex -----> Remote MCP Gateway -------> Dishpute Application API
 ChatGPT ---> Remote MCP Gateway -------> Dishpute Application API
+Claude ----> Remote MCP Gateway -------> Dishpute Application API
 ```
 
 ### Application API
@@ -124,7 +131,9 @@ The Application API owns authorization and business rules. It is the only suppor
 
 ### Remote MCP Gateway
 
-The Remote MCP Gateway is a publicly reachable integration adapter shared by ChatGPT and Codex clients. It presents narrow, structured tools to AI clients and translates approved tool calls into Dishpute API requests.
+The Remote MCP Gateway is a publicly reachable, client-neutral integration adapter
+shared by ChatGPT, Codex, and Claude clients. It presents narrow, structured tools to
+AI clients and translates approved tool calls into Dishpute API requests.
 
 Each person connects through their own authenticated identity. The gateway resolves that identity to an active Household Membership before allowing access to Household records. A client never chooses an unrestricted `household_id`, and possession of the public gateway URL does not grant access.
 

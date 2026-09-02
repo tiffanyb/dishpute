@@ -1,6 +1,6 @@
 import os
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -13,9 +13,11 @@ from dishpute.idempotency import execute_idempotent
 from dishpute.models import Household
 from dishpute.natural_language import NaturalLanguageError, interpret
 from dishpute.schemas import (
+    CalendarItemResponse,
     CompletedWorkCreate,
     CompletedWorkResponse,
     ContributionResponse,
+    HouseholdMemberResponse,
     NaturalLanguageCreate,
     NaturalLanguageResponse,
     TaskCreate,
@@ -27,16 +29,21 @@ from dishpute.schemas import (
     TaskTimeBlockResponse,
     TaskUpdate,
     TimeBlockUpdate,
+    WorkItemResponse,
 )
 from dishpute.services import (
     ApplicationError,
+    CalendarItem,
     ListedTask,
     ListedTimeBlock,
     TaskDetails,
     create_task,
     get_task_details,
+    list_calendar_items,
     list_contributions,
+    list_household_members,
     list_tasks,
+    list_work_items,
     record_completed_work,
     schedule_task,
     update_planned_time_block,
@@ -74,6 +81,7 @@ def _task_summary(result: ListedTask) -> TaskSummary:
         id=result.task.id,
         title=result.task.title,
         category=result.task.category,
+        work_scope=result.task.work_scope,
         lifecycle_status=result.task.lifecycle_status,
         parent_task_id=result.task.parent_task_id,
         participant_user_ids=result.participant_user_ids,
@@ -88,7 +96,28 @@ def _time_block_response(result: ListedTimeBlock) -> TaskTimeBlockResponse:
         starts_at=result.time_block.starts_at,
         ends_at=result.time_block.ends_at,
         status=result.time_block.status,
+        work_scope=result.time_block.work_scope,
         participant_user_ids=result.participant_user_ids,
+    )
+
+
+def _calendar_item_response(result: CalendarItem) -> CalendarItemResponse:
+    completion = result.completion
+    return CalendarItemResponse(
+        id=result.time_block.id,
+        item_type="completed" if result.time_block.block_kind == "actual" else "planned",
+        title=result.time_block.title,
+        category=result.category,
+        work_scope=result.time_block.work_scope,
+        status=result.time_block.status,
+        starts_at=result.time_block.starts_at,
+        ends_at=result.time_block.ends_at,
+        participant_user_ids=result.participant_user_ids,
+        task_ids=result.task_ids,
+        completion_record_id=completion.id if completion is not None else None,
+        counts_toward_fairness=(
+            completion.counts_toward_fairness if completion is not None else None
+        ),
     )
 
 
@@ -122,6 +151,59 @@ def handle_natural_language_error(_request: Request, error: NaturalLanguageError
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get(
+    "/households/{household_id}/members",
+    response_model=list[HouseholdMemberResponse],
+)
+def list_household_members_route(
+    household_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> list[HouseholdMemberResponse]:
+    with _transaction(session):
+        members = list_household_members(
+            session, household_id=household_id, actor_user_id=actor_user_id
+        )
+    return [HouseholdMemberResponse(**member.__dict__) for member in members]
+
+
+@app.get(
+    "/households/{household_id}/calendar-items",
+    response_model=list[CalendarItemResponse],
+)
+def list_calendar_items_route(
+    household_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+    range_start: Annotated[datetime, Query()],
+    range_end: Annotated[datetime, Query()],
+) -> list[CalendarItemResponse]:
+    with _transaction(session):
+        items = list_calendar_items(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            starts_before=range_end,
+            ends_after=range_start,
+        )
+        response_items = [_calendar_item_response(item) for item in items]
+    return response_items
+
+
+@app.get(
+    "/households/{household_id}/work-items",
+    response_model=list[WorkItemResponse],
+)
+def list_work_items_route(
+    household_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> list[WorkItemResponse]:
+    with _transaction(session):
+        items = list_work_items(session, household_id=household_id, actor_user_id=actor_user_id)
+    return [WorkItemResponse(**item.__dict__) for item in items]
 
 
 @app.get(
@@ -360,6 +442,8 @@ def natural_language_route(
                     task_id=result.completion.task_id,
                     participant_user_ids=result.participant_user_ids,
                     effective_duration_minutes=result.effective_duration_minutes,
+                    work_scope=result.completion.work_scope,
+                    counts_toward_fairness=result.completion.counts_toward_fairness,
                 )
                 return NaturalLanguageResponse(
                     interpreted_action=command.action,
@@ -383,6 +467,7 @@ def natural_language_route(
                 title=result.task.title,
                 description=result.task.description,
                 category=result.task.category,
+                work_scope=result.task.work_scope,
                 lifecycle_status=result.task.lifecycle_status,
                 parent_task_id=result.task.parent_task_id,
                 participant_user_ids=result.participant_user_ids,
@@ -432,6 +517,7 @@ def create_task_route(
                 title=created.task.title,
                 description=created.task.description,
                 category=created.task.category,
+                work_scope=created.task.work_scope,
                 lifecycle_status=created.task.lifecycle_status,
                 parent_task_id=created.task.parent_task_id,
                 participant_user_ids=created.participant_user_ids,
@@ -480,6 +566,8 @@ def record_completed_work_route(
                 task_id=recorded.completion.task_id,
                 participant_user_ids=recorded.participant_user_ids,
                 effective_duration_minutes=recorded.effective_duration_minutes,
+                work_scope=recorded.completion.work_scope,
+                counts_toward_fairness=recorded.completion.counts_toward_fairness,
             )
 
         result, replayed = execute_idempotent(

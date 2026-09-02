@@ -71,9 +71,7 @@ class AuthIdentity(Base):
     __table_args__ = (
         UniqueConstraint("provider", "provider_subject", name="auth_identity_provider_subject_key"),
         CheckConstraint("length(trim(provider)) > 0", name="auth_identity_provider_present"),
-        CheckConstraint(
-            "length(trim(provider_subject)) > 0", name="auth_identity_subject_present"
-        ),
+        CheckConstraint("length(trim(provider_subject)) > 0", name="auth_identity_subject_present"),
     )
 
 
@@ -91,9 +89,7 @@ class Household(TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="households_name_present"),
-        CheckConstraint(
-            "length(trim(default_timezone)) > 0", name="households_timezone_present"
-        ),
+        CheckConstraint("length(trim(default_timezone)) > 0", name="households_timezone_present"),
     )
 
 
@@ -137,9 +133,8 @@ class Task(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str] = mapped_column(Text, default="other", server_default="other")
-    lifecycle_status: Mapped[str] = mapped_column(
-        Text, default="active", server_default="active"
-    )
+    work_scope: Mapped[str] = mapped_column(Text, default="household", server_default="household")
+    lifecycle_status: Mapped[str] = mapped_column(Text, default="active", server_default="active")
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     estimated_duration_minutes: Mapped[int | None] = mapped_column(Integer)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -169,6 +164,7 @@ class Task(TimestampMixin, Base):
         ),
         CheckConstraint("length(trim(title)) > 0", name="tasks_title_present"),
         CheckConstraint("length(trim(category)) > 0", name="tasks_category_present"),
+        CheckConstraint("work_scope IN ('household', 'personal')", name="tasks_work_scope_valid"),
         CheckConstraint(
             "lifecycle_status IN ('active', 'completed', 'cancelled')",
             name="tasks_lifecycle_status_valid",
@@ -262,7 +258,9 @@ class RecurrenceRule(TimestampMixin, Base):
             "day_of_month IS NULL OR day_of_month BETWEEN 1 AND 31",
             name="recurrence_rules_day_of_month_valid",
         ),
-        CheckConstraint("ends_on IS NULL OR ends_on >= starts_on", name="recurrence_rules_dates_valid"),
+        CheckConstraint(
+            "ends_on IS NULL OR ends_on >= starts_on", name="recurrence_rules_dates_valid"
+        ),
         CheckConstraint(
             "days_of_week IS NULL OR days_of_week <@ ARRAY[0,1,2,3,4,5,6]::smallint[]",
             name="recurrence_rules_weekdays_valid",
@@ -280,9 +278,7 @@ class TaskInstance(TimestampMixin, Base):
     task_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     recurrence_rule_id: Mapped[UUID | None] = mapped_column(Uuid)
     occurrence_date: Mapped[date] = mapped_column(Date)
-    lifecycle_status: Mapped[str] = mapped_column(
-        Text, default="active", server_default="active"
-    )
+    lifecycle_status: Mapped[str] = mapped_column(Text, default="active", server_default="active")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     participants: Mapped[list[TaskInstanceParticipant]] = relationship(
@@ -359,6 +355,7 @@ class TimeBlock(TimestampMixin, Base):
     block_kind: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     title: Mapped[str | None] = mapped_column(Text)
+    work_scope: Mapped[str] = mapped_column(Text, default="household", server_default="household")
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -377,6 +374,9 @@ class TimeBlock(TimestampMixin, Base):
             name="time_blocks_creator_membership_fkey",
         ),
         CheckConstraint("block_kind IN ('planned', 'actual')", name="time_blocks_kind_valid"),
+        CheckConstraint(
+            "work_scope IN ('household', 'personal')", name="time_blocks_work_scope_valid"
+        ),
         CheckConstraint(
             "status IN ('planned', 'completed', 'cancelled')", name="time_blocks_status_valid"
         ),
@@ -478,6 +478,10 @@ class CompletionRecord(TimestampMixin, Base):
     task_instance_id: Mapped[UUID | None] = mapped_column(Uuid)
     time_block_id: Mapped[UUID | None] = mapped_column(Uuid)
     category: Mapped[str] = mapped_column(Text, default="other", server_default="other")
+    work_scope: Mapped[str] = mapped_column(Text, default="household", server_default="household")
+    counts_toward_fairness: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true")
+    )
     description: Mapped[str | None] = mapped_column(Text)
     duration_override_minutes: Mapped[int | None] = mapped_column(Integer)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -526,6 +530,10 @@ class CompletionRecord(TimestampMixin, Base):
             name="completion_records_time_block_fkey",
         ),
         CheckConstraint("length(trim(category)) > 0", name="completion_records_category_present"),
+        CheckConstraint(
+            "work_scope IN ('household', 'personal')",
+            name="completion_records_work_scope_valid",
+        ),
         CheckConstraint(
             "duration_override_minutes IS NULL OR duration_override_minutes > 0",
             name="completion_records_override_positive",
@@ -602,7 +610,9 @@ class AuditEvent(Base):
             ["household_memberships.household_id", "household_memberships.user_id"],
             name="audit_events_actor_membership_fkey",
         ),
-        CheckConstraint("action IN ('create', 'update', 'delete')", name="audit_events_action_valid"),
+        CheckConstraint(
+            "action IN ('create', 'update', 'delete')", name="audit_events_action_valid"
+        ),
         CheckConstraint("length(trim(entity_type)) > 0", name="audit_events_entity_type_present"),
         CheckConstraint(
             "before_values IS NOT NULL OR after_values IS NOT NULL",
