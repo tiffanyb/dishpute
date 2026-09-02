@@ -56,9 +56,23 @@ async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Dishpute returned ${response.status}`);
+    throw new Error(formatApiError(body.detail, response.status));
   }
   return response.json();
+}
+
+function formatApiError(detail, status) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((issue) => {
+      const field = Array.isArray(issue.loc) ? issue.loc.at(-1) : null;
+      const label = typeof field === "string"
+        ? `${field.replaceAll("_", " ").replace(/^./, (character) => character.toUpperCase())}: `
+        : "";
+      return `${label}${issue.msg || "Invalid value"}`;
+    }).join(" ");
+  }
+  return `Dishpute returned ${status}`;
 }
 
 async function bootstrap() {
@@ -241,6 +255,7 @@ function setAuthMode(mode) {
   $$("#auth-mode button").forEach((button) => button.classList.toggle("active", button.dataset.authMode === mode));
   $$(".signup-field").forEach((field) => field.classList.toggle("hidden", !signup));
   $("#display-name").required = signup;
+  $("#password").minLength = signup ? 10 : 1;
   $("#password").autocomplete = signup ? "new-password" : "current-password";
   $("#auth-title").textContent = signup ? "Create your account" : "Sign in to Dishpute";
   $("#save-connection").textContent = signup ? "Create account" : "Sign in";
