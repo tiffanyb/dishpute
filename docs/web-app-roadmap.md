@@ -32,9 +32,9 @@ complete.
 ### Time Blocks
 
 - [ ] Create a standalone planned Time Block from Calendar.
-- [ ] Schedule an existing Task from Calendar or Task details.
+- [x] Schedule an existing Task from Calendar or Task details.
 - [ ] Capture date, start time, end time, title, and planned participants.
-- [ ] Support multiple Time Blocks for one Task.
+- [x] Support multiple Time Blocks for one Task.
 - [ ] Move or resize a planned Time Block.
 - [ ] Cancel a Time Block without deleting its Task.
 

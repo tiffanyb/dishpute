@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.8" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.9" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.8" defer></script>
+    <script src="/assets/app.js?v=20260902.9" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -241,7 +241,8 @@
       <p class="task-description" id="task-detail-description"></p>
       <dl class="item-details" id="task-detail-metadata"></dl>
       <section class="detail-section">
-        <h3>Reserved time</h3><div id="task-detail-time-blocks"></div>
+        <div class="detail-section-header"><h3>Reserved time</h3><button class="text-button" id="reserve-time-button" type="button"><i data-lucide="plus"></i>Reserve time</button></div>
+        <div id="task-detail-time-blocks"></div>
       </section>
       <section class="detail-section">
         <h3>Subtasks</h3><div id="task-detail-subtasks"></div>
@@ -252,6 +253,26 @@
         <button class="text-button" id="reopen-task-button" type="button">Reopen</button>
         <button class="primary-button" id="complete-task-button" type="button"><i data-lucide="check"></i>Complete</button>
       </div>
+    </dialog>
+
+    <dialog id="schedule-dialog">
+      <form id="schedule-form">
+        <div class="dialog-header">
+          <div><p class="section-kicker">Calendar</p><h2>Reserve time</h2></div>
+          <button class="icon-button" id="close-schedule" type="button" title="Close"><i data-lucide="x"></i></button>
+        </div>
+        <label>Date<input id="schedule-date" type="date" required /></label>
+        <div class="form-grid">
+          <label>Start time<input id="schedule-start" type="time" required /></label>
+          <label>End time<input id="schedule-end" type="time" required /></label>
+        </div>
+        <fieldset><legend>Planned with</legend><div class="participant-options" id="schedule-participants"></div></fieldset>
+        <p class="form-error hidden" id="schedule-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="text-button" id="cancel-schedule" type="button">Cancel</button>
+          <button class="primary-button" id="save-schedule-button" type="submit">Reserve time</button>
+        </div>
+      </form>
     </dialog>
 
     <div class="toast hidden" id="toast" role="status"></div>

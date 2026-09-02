@@ -180,6 +180,9 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .task-description { margin: -8px 0 22px; color: var(--muted); line-height: 1.55; }
 .detail-section { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 .detail-section h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; color: var(--muted); }
+.detail-section-header { display: flex; align-items: center; justify-content: space-between; }
+.detail-section-header h3 { margin: 0; }
+.detail-section-header .text-button { font-size: 11px; }
 .detail-empty { color: var(--muted); font-size: 12px; }
 .detail-row { padding: 9px 0; border-bottom: 1px solid #e8eae6; font-size: 12px; }
 .detail-row:last-child { border-bottom: 0; }

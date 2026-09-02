@@ -319,6 +319,53 @@ async function updateSelectedTaskLifecycle(lifecycleStatus) {
   }
 }
 
+function openScheduleDialog() {
+  const today = new Date();
+  $("#schedule-form").reset();
+  $("#schedule-date").value = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
+  $("#schedule-start").value = "09:00";
+  $("#schedule-end").value = "10:00";
+  const task = state.workItems.find((item) => item.id === state.selectedTaskId);
+  $("#schedule-participants").innerHTML = state.members.map((member) => `
+    <label class="participant-option"><input type="checkbox" value="${member.user_id}" ${task?.participant_user_ids.includes(member.user_id) ? "checked" : ""} />${escapeHtml(member.display_name)}</label>`).join("");
+  $("#schedule-error").classList.add("hidden");
+  $("#task-detail-dialog").close();
+  $("#schedule-dialog").showModal();
+}
+
+async function scheduleSelectedTask(event) {
+  event.preventDefault();
+  const date = $("#schedule-date").value;
+  const startsAt = new Date(`${date}T${$("#schedule-start").value}`);
+  const endsAt = new Date(`${date}T${$("#schedule-end").value}`);
+  const errorElement = $("#schedule-error");
+  if (endsAt <= startsAt) {
+    errorElement.textContent = "End time must be after start time.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  const button = $("#save-schedule-button");
+  button.disabled = true;
+  errorElement.classList.add("hidden");
+  try {
+    await api(`/households/${state.householdId}/tasks/${state.selectedTaskId}/time-blocks`, {
+      method: "POST", idempotentWrite: true,
+      body: JSON.stringify({
+        starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
+        participant_user_ids: $$("#schedule-participants input:checked").map((input) => input.value),
+      }),
+    });
+    $("#schedule-dialog").close();
+    state.activeView = "calendar";
+    state.weekStart = startOfWeek(startsAt);
+    await loadAll();
+    showToast("Time reserved");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  } finally { button.disabled = false; }
+}
+
 function showConnectionState() {
   $$(".view, .view-tabs").forEach((element) => element.classList.add("hidden"));
   $("#connection-empty-state").classList.remove("hidden");
@@ -500,6 +547,10 @@ function bindEvents() {
   $("#cancel-task-button").addEventListener("click", () => {
     if (window.confirm("Cancel this Task? Its history will be preserved.")) updateSelectedTaskLifecycle("cancelled");
   });
+  $("#reserve-time-button").addEventListener("click", openScheduleDialog);
+  $("#close-schedule").addEventListener("click", () => $("#schedule-dialog").close());
+  $("#cancel-schedule").addEventListener("click", () => $("#schedule-dialog").close());
+  $("#schedule-form").addEventListener("submit", scheduleSelectedTask);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
