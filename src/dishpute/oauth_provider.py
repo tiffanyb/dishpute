@@ -250,13 +250,19 @@ input{{box-sizing:border-box;width:100%;padding:10px;border:1px solid #8b9991}}b
                 or auth_session.expires_at <= now
             ):
                 return None
+            household = session.get(Household, grant.household_id)
+            if household is None:
+                return None
             return AccessToken(
                 token=token,
                 client_id=grant.client_id,
                 scopes=grant.scopes,
                 expires_at=int(auth_session.expires_at.timestamp()),
                 subject=str(auth_session.user_id),
-                claims={"household_id": str(grant.household_id)},
+                claims={
+                    "household_id": str(grant.household_id),
+                    "timezone": household.default_timezone,
+                },
             )
 
     async def revoke_token(self, token: AccessToken | RefreshToken) -> None:

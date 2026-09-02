@@ -1,12 +1,23 @@
 import os
 from datetime import date, datetime, time
 from typing import Any, Literal
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import httpx
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from pydantic import AnyHttpUrl
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, RedirectResponse
+
+from dishpute.auth import AuthenticationError
+from dishpute.database import build_engine, build_session_factory
+from dishpute.oauth_provider import DishputeOAuthProvider
 
 
 class DishputeApiError(RuntimeError):
@@ -18,15 +29,15 @@ class DishputeApiClient:
         self,
         *,
         base_url: str,
-        household_id: UUID,
-        user_id: UUID,
+        household_id: UUID | None,
+        user_id: UUID | None,
         timezone_name: str,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.household_id = household_id
         self.user_id = user_id
-        self.timezone = ZoneInfo(timezone_name)
+        self.default_timezone = ZoneInfo(timezone_name)
         self.transport = transport
 
     @classmethod
@@ -46,7 +57,28 @@ class DishputeApiClient:
         )
 
     def local_datetime(self, work_date: date, work_time: time) -> datetime:
-        return datetime.combine(work_date, work_time, self.timezone)
+        access_token = get_access_token()
+        timezone_name = (access_token.claims or {}).get("timezone") if access_token else None
+        return datetime.combine(work_date, work_time, ZoneInfo(timezone_name) if timezone_name else self.default_timezone)
+
+    @property
+    def active_household_id(self) -> UUID:
+        access_token = get_access_token()
+        value = (access_token.claims or {}).get("household_id") if access_token else None
+        if value:
+            return UUID(value)
+        if self.household_id is None:
+            raise RuntimeError("The OAuth token does not identify a household")
+        return self.household_id
+
+    @property
+    def active_user_id(self) -> UUID:
+        access_token = get_access_token()
+        if access_token and access_token.subject:
+            return UUID(access_token.subject)
+        if self.user_id is None:
+            raise RuntimeError("The OAuth token does not identify a member")
+        return self.user_id
 
     async def request(
         self,
@@ -57,7 +89,12 @@ class DishputeApiClient:
         params: dict[str, Any] | None = None,
         write: bool = False,
     ) -> Any:
-        headers = {"X-Actor-User-Id": str(self.user_id)}
+        access_token = get_access_token()
+        headers = (
+            {"Authorization": f"Bearer {access_token.token}"}
+            if access_token
+            else {"X-Actor-User-Id": str(self.active_user_id)}
+        )
         if write:
             headers["Idempotency-Key"] = str(uuid4())
         async with httpx.AsyncClient(
@@ -75,7 +112,13 @@ class DishputeApiClient:
         return response.json()
 
 
-def build_mcp(client: DishputeApiClient) -> FastMCP:
+def build_mcp(
+    client: DishputeApiClient,
+    *,
+    oauth_provider: DishputeOAuthProvider | None = None,
+    auth_settings: AuthSettings | None = None,
+    transport_security: TransportSecuritySettings | None = None,
+) -> FastMCP:
     server = FastMCP(
         "Dishpute",
         instructions=(
@@ -89,6 +132,9 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
         json_response=True,
         host=os.environ.get("DISHPUTE_MCP_HOST", "127.0.0.1"),
         port=int(os.environ.get("DISHPUTE_MCP_PORT", "8001")),
+        auth_server_provider=oauth_provider,
+        auth=auth_settings,
+        transport_security=transport_security,
     )
     read_only = ToolAnnotations(
         readOnlyHint=True,
@@ -121,7 +167,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
             raise ValueError("end_time must be after start_time on the same date")
         return await client.request(
             "POST",
-            f"/households/{client.household_id}/completed-work",
+            f"/households/{client.active_household_id}/completed-work",
             write=True,
             json={
                 "category": category,
@@ -129,7 +175,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
                 "work_scope": work_scope,
                 "counts_toward_fairness": counts_toward_fairness,
                 "participant_user_ids": [
-                    str(value) for value in (completed_by_user_ids or [client.user_id])
+                    str(value) for value in (completed_by_user_ids or [client.active_user_id])
                 ],
                 "started_at": started_at.isoformat(),
                 "ended_at": ended_at.isoformat(),
@@ -148,7 +194,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
         """Create future or unscheduled work. Do not use this for unmatched work that already happened."""
         return await client.request(
             "POST",
-            f"/households/{client.household_id}/tasks",
+            f"/households/{client.active_household_id}/tasks",
             write=True,
             json={
                 "title": title,
@@ -163,7 +209,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
     @server.tool(annotations=read_only, structured_output=True)
     async def list_work_items() -> list[dict[str, Any]]:
         """List shared Tasks and completed work visible in the Dishpute Tasks tab."""
-        return await client.request("GET", f"/households/{client.household_id}/work-items")
+        return await client.request("GET", f"/households/{client.active_household_id}/work-items")
 
     @server.tool(annotations=read_only, structured_output=True)
     async def get_calendar(range_start: date, range_end: date) -> list[dict[str, Any]]:
@@ -174,7 +220,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
             raise ValueError("range_end must be after range_start")
         return await client.request(
             "GET",
-            f"/households/{client.household_id}/calendar-items",
+            f"/households/{client.active_household_id}/calendar-items",
             params={
                 "range_start": starts_at.isoformat(),
                 "range_end": ends_at.isoformat(),
@@ -207,7 +253,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
             raise ValueError("Provide at least one Task field to update")
         return await client.request(
             "PATCH",
-            f"/households/{client.household_id}/tasks/{task_id}",
+            f"/households/{client.active_household_id}/tasks/{task_id}",
             write=True,
             json=payload,
         )
@@ -225,7 +271,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
         ends_at = client.local_datetime(work_date, end_time)
         return await client.request(
             "POST",
-            f"/households/{client.household_id}/tasks/{task_id}/time-blocks",
+            f"/households/{client.active_household_id}/tasks/{task_id}/time-blocks",
             write=True,
             json={
                 "starts_at": starts_at.isoformat(),
@@ -248,7 +294,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
         """Move an existing planned Time Block without deleting its Task."""
         return await client.request(
             "PATCH",
-            f"/households/{client.household_id}/time-blocks/{time_block_id}",
+            f"/households/{client.active_household_id}/time-blocks/{time_block_id}",
             write=True,
             json={
                 "starts_at": client.local_datetime(work_date, start_time).isoformat(),
@@ -261,7 +307,7 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
         """Explicitly mark a Task completed. This does not create completed-work duration by itself."""
         return await client.request(
             "PATCH",
-            f"/households/{client.household_id}/tasks/{task_id}/lifecycle",
+            f"/households/{client.active_household_id}/tasks/{task_id}/lifecycle",
             write=True,
             json={"lifecycle_status": "completed"},
         )
@@ -269,8 +315,73 @@ def build_mcp(client: DishputeApiClient) -> FastMCP:
     return server
 
 
+def build_oauth_mcp() -> FastMCP:
+    issuer_url = os.environ["DISHPUTE_MCP_PUBLIC_URL"].rstrip("/")
+    issuer = AnyHttpUrl(issuer_url)
+    database_url = os.environ["DATABASE_URL"]
+    provider = DishputeOAuthProvider(
+        build_session_factory(build_engine(database_url)),
+        issuer_url,
+    )
+    auth_settings = AuthSettings(
+        issuer_url=issuer,
+        resource_server_url=AnyHttpUrl(f"{issuer_url}/mcp"),
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True,
+            valid_scopes=["dishpute:read", "dishpute:write"],
+            default_scopes=["dishpute:read", "dishpute:write"],
+        ),
+        revocation_options=RevocationOptions(enabled=True),
+        required_scopes=["dishpute:read", "dishpute:write"],
+    )
+    client = DishputeApiClient(
+        base_url=os.environ.get("DISHPUTE_API_URL", "http://127.0.0.1:8000"),
+        household_id=None,
+        user_id=None,
+        timezone_name="UTC",
+    )
+    host_with_port = urlparse(issuer_url).netloc
+    server = build_mcp(
+        client,
+        oauth_provider=provider,
+        auth_settings=auth_settings,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[host_with_port, "127.0.0.1:8001", "localhost:8001"],
+            allowed_origins=[issuer_url],
+        ),
+    )
+
+    @server.custom_route("/oauth/login", methods=["GET", "POST"])
+    async def oauth_login(request: Request):
+        if request.method == "GET":
+            request_token = request.query_params.get("request", "")
+            page = provider.authorization_page(request_token)
+            if page is None:
+                return HTMLResponse("Connection request expired", status_code=400)
+            return HTMLResponse(page)
+
+        form = await request.form()
+        request_token = str(form.get("request", ""))
+        try:
+            redirect_url = provider.complete_authorization(
+                request_token,
+                str(form.get("email", "")),
+                str(form.get("password", "")),
+            )
+        except AuthenticationError as exc:
+            page = provider.authorization_page(request_token, str(exc))
+            return HTMLResponse(page or "Connection request expired", status_code=401)
+        return RedirectResponse(redirect_url, status_code=303)
+
+    return server
+
+
 def main() -> None:
-    build_mcp(DishputeApiClient.from_environment()).run(transport="streamable-http")
+    if os.environ.get("DISHPUTE_MCP_PUBLIC_URL"):
+        build_oauth_mcp().run(transport="streamable-http")
+    else:
+        build_mcp(DishputeApiClient.from_environment()).run(transport="streamable-http")
 
 
 if __name__ == "__main__":

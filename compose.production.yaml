@@ -26,5 +26,27 @@ services:
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:8000:8000"
 
+  mcp:
+    build: .
+    restart: unless-stopped
+    command: ["uv", "run", "dishpute-mcp"]
+    depends_on:
+      database:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://dishpute:${POSTGRES_PASSWORD}@database:5432/dishpute
+      DISHPUTE_API_URL: http://web:8000
+      DISHPUTE_MCP_HOST: "0.0.0.0"
+      DISHPUTE_MCP_PORT: "8001"
+      DISHPUTE_MCP_PUBLIC_URL: ${DISHPUTE_MCP_PUBLIC_URL:-https://localhost:8001}
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/.well-known/oauth-authorization-server')"]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+
 volumes:
   dishpute_production_data:

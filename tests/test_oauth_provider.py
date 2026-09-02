@@ -74,7 +74,10 @@ async def test_oauth_authorization_tokens_and_rotation(api_client, session) -> N
     access = await provider.load_access_token(tokens.access_token)
     assert access is not None
     assert access.subject == account["user_id"]
-    assert access.claims == {"household_id": household["id"]}
+    assert access.claims == {
+        "household_id": household["id"],
+        "timezone": "America/Phoenix",
+    }
 
     me = api_client.get("/me", headers={"Authorization": f"Bearer {tokens.access_token}"})
     assert me.status_code == 200
