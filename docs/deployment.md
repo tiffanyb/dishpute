@@ -22,6 +22,9 @@ The web service listens only on `127.0.0.1:8000`. Configure the reverse proxy to
 the public HTTPS origin to that address. The container applies Alembic migrations
 before Uvicorn starts and exposes `/health` for monitoring.
 
+For a private Tailscale-only deployment, set `BIND_ADDRESS` to the server's Tailscale
+IPv4 address. Do not set it to `0.0.0.0` unless a host firewall restricts access.
+
 The production configuration disables `X-Actor-User-Id`. Browser access therefore
 requires a real bearer session created through Dishpute signup or login.
 

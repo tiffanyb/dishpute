@@ -24,7 +24,7 @@ services:
       DATABASE_URL: postgresql+psycopg://dishpute:${POSTGRES_PASSWORD}@database:5432/dishpute
       DISHPUTE_ALLOW_DEV_ACTOR_HEADER: "false"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${BIND_ADDRESS:-127.0.0.1}:8000:8000"
 
 volumes:
   dishpute_production_data:
