@@ -3,6 +3,7 @@ const state = {
   householdId: localStorage.getItem("dishpute.householdId") || "",
   userId: "",
   displayName: "",
+  household: null,
   members: [],
   calendarItems: [],
   workItems: [],
@@ -93,6 +94,7 @@ async function bootstrap() {
       return;
     }
     state.householdId = selected.id;
+    state.household = selected;
     localStorage.setItem("dishpute.householdId", state.householdId);
     await loadAll();
   } catch (error) {
@@ -120,6 +122,7 @@ async function loadAll() {
     renderHeader();
     renderCalendar();
     renderTasks();
+    renderHousehold();
     showAppState();
   } catch (error) {
     showToast(error.message);
@@ -182,6 +185,18 @@ function renderTasks() {
   $("#task-list").innerHTML = visible.length ? visible.map(taskItemMarkup).join("") : '<div class="list-empty">No work matches this view.</div>';
   $$(".task-row").forEach((button) => button.addEventListener("click", () => openItem("work", button.dataset.id)));
   if (window.lucide) window.lucide.createIcons();
+}
+
+function renderHousehold() {
+  $("#household-name-heading").textContent = state.household?.name || "Household";
+  $("#household-timezone-label").textContent = state.household?.default_timezone || "UTC";
+  $("#household-member-count").textContent = String(state.members.length);
+  $("#household-member-list").innerHTML = state.members.map((member, index) => `
+    <div class="member-row">
+      <span class="member-avatar" style="--member-color:${memberColors[index % memberColors.length]}">${escapeHtml(member.display_name.charAt(0).toUpperCase())}</span>
+      <span><strong>${escapeHtml(member.display_name)}</strong><small>Household member</small></span>
+      ${member.user_id === state.userId ? '<span class="current-member">You</span>' : ""}
+    </div>`).join("");
 }
 
 function taskItemMarkup(item) {
@@ -372,6 +387,20 @@ function bindEvents() {
       $("#generated-invite").textContent = result.invite_code;
       $("#invite-result").classList.remove("hidden");
     } catch (error) { showToast(error.message); }
+  });
+  $("#household-invite-button").addEventListener("click", async () => {
+    const button = $("#household-invite-button");
+    button.disabled = true;
+    try {
+      const result = await api(`/households/${state.householdId}/invites`, { method: "POST" });
+      $("#household-invite-code").textContent = result.invite_code;
+      $("#household-invite-panel").classList.remove("hidden");
+    } catch (error) { showToast(error.message); }
+    finally { button.disabled = false; }
+  });
+  $("#copy-invite-button").addEventListener("click", async () => {
+    await navigator.clipboard.writeText($("#household-invite-code").textContent);
+    showToast("Invitation code copied");
   });
 }
 

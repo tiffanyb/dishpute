@@ -9,6 +9,8 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert page.status_code == 200
     assert "Calendar" in page.text
     assert "Tasks" in page.text
+    assert "Household" in page.text
+    assert "Invite member" in page.text
     assert "Sign in to Dishpute" in page.text
     assert "auth-error" in page.text
     assert "Use at least 10 characters" in page.text
@@ -24,3 +26,4 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert 'api("/households/join"' in script.text
     assert "do not match a Dishpute account" in script.text
     assert "formatApiError" in script.text
+    assert "renderHousehold" in script.text

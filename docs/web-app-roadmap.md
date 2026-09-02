@@ -8,10 +8,10 @@ complete.
 
 ### Household members
 
-- [ ] Add a Household view that lists every active member.
-- [ ] Show member names consistently anywhere work participants appear.
+- [x] Add a Household view that lists every active member.
+- [x] Show member names consistently anywhere work participants appear.
 - [ ] Show who created a Task, who plans to participate, and who completed work.
-- [ ] Let a member generate and copy a single-use household invitation.
+- [x] Let a member generate and copy a single-use household invitation.
 - [ ] Let a signed-in member join a household using an invitation.
 - [ ] Let members update their own display name.
 - [ ] Use collaborative labels such as `Planned with` and `Completed by`.

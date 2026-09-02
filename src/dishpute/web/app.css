@@ -127,6 +127,22 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 32px 48px; }
 .empty-state p { color: var(--muted); }
 .hidden { display: none !important; }
 .primary-button { min-height: 40px; padding: 0 16px; border-radius: 6px; background: var(--green); color: white; font-weight: 700; }
+.primary-button:disabled { cursor: wait; opacity: .65; }
+.primary-button svg, .text-button svg { width: 16px; height: 16px; vertical-align: middle; margin-right: 6px; }
+
+.household-meta { display: flex; gap: 28px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.household-meta > span { display: grid; grid-template-columns: 20px auto; column-gap: 7px; align-items: center; font-size: 12px; }
+.household-meta svg { width: 16px; color: var(--muted); grid-row: span 2; }
+.household-meta strong { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+.member-list { background: var(--surface); border-bottom: 1px solid var(--line); }
+.member-row { min-height: 64px; display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #e8eae6; }
+.member-row:last-child { border-bottom: 0; }
+.member-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--member-color); font-weight: 700; }
+.member-row strong, .member-row small { display: block; }
+.member-row small { color: var(--muted); font-size: 11px; }
+.current-member { padding: 4px 7px; border-radius: 4px; background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.invite-panel { margin-top: 20px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.invite-panel strong { display: block; margin-top: 5px; overflow-wrap: anywhere; }
 
 dialog { width: min(480px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 8px; padding: 22px; box-shadow: 0 24px 70px rgba(28,33,27,.2); }
 dialog::backdrop { background: rgba(24,28,23,.38); backdrop-filter: blur(2px); }

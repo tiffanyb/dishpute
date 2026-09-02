@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.4" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.6" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.5" defer></script>
+    <script src="/assets/app.js?v=20260902.6" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -46,6 +46,10 @@
         <button class="view-tab" data-view="tasks" type="button">
           <i data-lucide="list-checks"></i>
           Tasks
+        </button>
+        <button class="view-tab" data-view="household" type="button">
+          <i data-lucide="users"></i>
+          Household
         </button>
       </nav>
 
@@ -84,6 +88,28 @@
         </div>
         <div class="task-summary" id="task-summary"></div>
         <div class="task-list" id="task-list"></div>
+      </section>
+
+      <section class="view" id="household-view">
+        <div class="view-toolbar">
+          <div>
+            <p class="section-kicker">Shared space</p>
+            <h2 id="household-name-heading">Household</h2>
+          </div>
+          <button class="primary-button" id="household-invite-button" type="button">
+            <i data-lucide="user-plus"></i>
+            Invite member
+          </button>
+        </div>
+        <div class="household-meta">
+          <span><i data-lucide="clock-3"></i><strong>Time zone</strong><span id="household-timezone-label"></span></span>
+          <span><i data-lucide="users"></i><strong>Members</strong><span id="household-member-count"></span></span>
+        </div>
+        <div class="member-list" id="household-member-list"></div>
+        <div class="invite-panel hidden" id="household-invite-panel">
+          <div><p class="section-kicker">Single-use invitation</p><strong id="household-invite-code"></strong></div>
+          <button class="text-button" id="copy-invite-button" type="button"><i data-lucide="copy"></i>Copy code</button>
+        </div>
       </section>
 
       <section class="empty-state hidden" id="connection-empty-state">
