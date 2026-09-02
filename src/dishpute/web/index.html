@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.6" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.7" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.6" defer></script>
+    <script src="/assets/app.js?v=20260902.7" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -80,10 +80,13 @@
             <p class="section-kicker">Everything visible</p>
             <h2>Household work</h2>
           </div>
-          <div class="segmented-control" id="task-filters" aria-label="Filter work items">
-            <button class="active" data-filter="all" type="button">All</button>
-            <button data-filter="active" type="button">Active</button>
-            <button data-filter="completed" type="button">Completed</button>
+          <div class="toolbar-actions">
+            <div class="segmented-control" id="task-filters" aria-label="Filter work items">
+              <button class="active" data-filter="all" type="button">All</button>
+              <button data-filter="active" type="button">Active</button>
+              <button data-filter="completed" type="button">Completed</button>
+            </div>
+            <button class="primary-button" id="new-task-button" type="button"><i data-lucide="plus"></i>New task</button>
           </div>
         </div>
         <div class="task-summary" id="task-summary"></div>
@@ -196,6 +199,38 @@
         </button>
       </div>
       <dl class="item-details" id="item-details"></dl>
+    </dialog>
+
+    <dialog id="task-create-dialog">
+      <form id="task-create-form">
+        <div class="dialog-header">
+          <div><p class="section-kicker">New work</p><h2>Create a task</h2></div>
+          <button class="icon-button" id="close-task-create" type="button" title="Close"><i data-lucide="x"></i></button>
+        </div>
+        <label>Title<input id="task-title" maxlength="200" required /></label>
+        <label>Description<textarea id="task-description" rows="3"></textarea></label>
+        <div class="form-grid">
+          <label>Category
+            <select id="task-category">
+              <option value="other">Other</option><option value="cleaning">Cleaning</option>
+              <option value="cooking">Cooking</option><option value="laundry">Laundry</option>
+              <option value="shopping">Shopping</option><option value="planning">Planning</option>
+            </select>
+          </label>
+          <label>Scope
+            <select id="task-scope"><option value="household">Household</option><option value="personal">Personal</option></select>
+          </label>
+        </div>
+        <fieldset>
+          <legend>Planned with</legend>
+          <div class="participant-options" id="task-participants"></div>
+        </fieldset>
+        <p class="form-error hidden" id="task-create-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="text-button" id="cancel-task-create" type="button">Cancel</button>
+          <button class="primary-button" id="save-task-button" type="submit">Create task</button>
+        </div>
+      </form>
     </dialog>
 
     <div class="toast hidden" id="toast" role="status"></div>

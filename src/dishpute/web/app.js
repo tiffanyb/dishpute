@@ -54,6 +54,7 @@ async function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (state.accessToken) headers.Authorization = `Bearer ${state.accessToken}`;
   if (options.body) headers["Content-Type"] = "application/json";
+  if (options.idempotentWrite) headers["Idempotency-Key"] = crypto.randomUUID();
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -197,6 +198,45 @@ function renderHousehold() {
       <span><strong>${escapeHtml(member.display_name)}</strong><small>Household member</small></span>
       ${member.user_id === state.userId ? '<span class="current-member">You</span>' : ""}
     </div>`).join("");
+}
+
+function openTaskCreateDialog() {
+  $("#task-create-form").reset();
+  $("#task-create-error").classList.add("hidden");
+  $("#task-participants").innerHTML = state.members.map((member) => `
+    <label class="participant-option">
+      <input type="checkbox" value="${member.user_id}" ${member.user_id === state.userId ? "checked" : ""} />
+      ${escapeHtml(member.display_name)}
+    </label>`).join("");
+  $("#task-create-dialog").showModal();
+}
+
+async function createTask(event) {
+  event.preventDefault();
+  const button = $("#save-task-button");
+  const errorElement = $("#task-create-error");
+  button.disabled = true;
+  errorElement.classList.add("hidden");
+  try {
+    await api(`/households/${state.householdId}/tasks`, {
+      method: "POST",
+      idempotentWrite: true,
+      body: JSON.stringify({
+        title: $("#task-title").value,
+        description: $("#task-description").value || null,
+        category: $("#task-category").value,
+        work_scope: $("#task-scope").value,
+        participant_user_ids: $$("#task-participants input:checked").map((input) => input.value),
+      }),
+    });
+    $("#task-create-dialog").close();
+    state.activeView = "tasks";
+    await loadAll();
+    showToast("Task created");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  } finally { button.disabled = false; }
 }
 
 function taskItemMarkup(item) {
@@ -402,6 +442,10 @@ function bindEvents() {
     await navigator.clipboard.writeText($("#household-invite-code").textContent);
     showToast("Invitation code copied");
   });
+  $("#new-task-button").addEventListener("click", openTaskCreateDialog);
+  $("#close-task-create").addEventListener("click", () => $("#task-create-dialog").close());
+  $("#cancel-task-create").addEventListener("click", () => $("#task-create-dialog").close());
+  $("#task-create-form").addEventListener("submit", createTask);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

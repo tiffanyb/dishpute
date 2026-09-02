@@ -18,9 +18,9 @@ complete.
 
 ### Tasks
 
-- [ ] Create a Task from the Tasks view.
-- [ ] Capture title, description, category, and household or personal scope.
-- [ ] Select zero, one, or multiple planned participants.
+- [x] Create a Task from the Tasks view.
+- [x] Capture title, description, category, and household or personal scope.
+- [x] Select zero, one, or multiple planned participants.
 - [ ] Optionally schedule a Time Block while creating a Task.
 - [ ] Create a Subtask beneath an existing Task.
 - [ ] Open a complete Task detail view.
