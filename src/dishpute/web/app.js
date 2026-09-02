@@ -366,6 +366,67 @@ async function scheduleSelectedTask(event) {
   } finally { button.disabled = false; }
 }
 
+function openCompletedWorkDialog() {
+  const now = new Date();
+  $("#completed-work-form").reset();
+  $("#completed-work-date").value = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+  $("#completed-work-participants").innerHTML = state.members.map((member) => `
+    <label class="participant-option"><input type="checkbox" value="${member.user_id}" ${member.user_id === state.userId ? "checked" : ""} />${escapeHtml(member.display_name)}</label>`).join("");
+  const tasks = state.workItems.filter((item) => item.item_type === "task" && item.status === "active");
+  $("#completed-work-task").innerHTML = '<option value="">None</option>' + tasks.map((task) => `<option value="${task.id}">${escapeHtml(task.title)}</option>`).join("");
+  $("#completed-work-error").classList.add("hidden");
+  $("#completed-work-dialog").showModal();
+}
+
+async function recordCompletedWork(event) {
+  event.preventDefault();
+  const date = $("#completed-work-date").value;
+  const start = $("#completed-work-start").value;
+  const end = $("#completed-work-end").value;
+  const duration = $("#completed-work-duration").value;
+  const errorElement = $("#completed-work-error");
+  if ((!start || !end) && !duration) {
+    errorElement.textContent = "Enter a start and end time, or a manual duration.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  const participantIds = $$("#completed-work-participants input:checked").map((input) => input.value);
+  if (!participantIds.length) {
+    errorElement.textContent = "Choose at least one person under Completed by.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  const fairness = $("#completed-work-fairness").value;
+  const taskId = $("#completed-work-task").value || null;
+  const button = $("#save-completed-work");
+  button.disabled = true;
+  errorElement.classList.add("hidden");
+  try {
+    await api(`/households/${state.householdId}/completed-work`, {
+      method: "POST", idempotentWrite: true,
+      body: JSON.stringify({
+        description: $("#completed-work-title").value,
+        category: $("#completed-work-category").value,
+        work_scope: $("#completed-work-scope").value,
+        counts_toward_fairness: fairness === "auto" ? null : fairness === "include",
+        participant_user_ids: participantIds,
+        started_at: start && end ? new Date(`${date}T${start}`).toISOString() : null,
+        ended_at: start && end ? new Date(`${date}T${end}`).toISOString() : null,
+        duration_override_minutes: duration ? Number(duration) : null,
+        task_id: taskId,
+        complete_task: Boolean(taskId && $("#completed-work-complete-task").checked),
+      }),
+    });
+    $("#completed-work-dialog").close();
+    state.weekStart = startOfWeek(new Date(`${date}T12:00`));
+    await loadAll();
+    showToast("Completed work recorded");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  } finally { button.disabled = false; }
+}
+
 function showConnectionState() {
   $$(".view, .view-tabs").forEach((element) => element.classList.add("hidden"));
   $("#connection-empty-state").classList.remove("hidden");
@@ -551,6 +612,10 @@ function bindEvents() {
   $("#close-schedule").addEventListener("click", () => $("#schedule-dialog").close());
   $("#cancel-schedule").addEventListener("click", () => $("#schedule-dialog").close());
   $("#schedule-form").addEventListener("submit", scheduleSelectedTask);
+  $("#record-work-button").addEventListener("click", openCompletedWorkDialog);
+  $("#close-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
+  $("#cancel-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
+  $("#completed-work-form").addEventListener("submit", recordCompletedWork);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

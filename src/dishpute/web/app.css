@@ -160,6 +160,9 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .participant-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
 .participant-option { display: flex; align-items: center; gap: 7px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font-weight: 500; }
 .participant-option input { width: 15px; height: 15px; margin: 0; }
+.optional-label { font-weight: 400; text-transform: none; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 500; }
+.checkbox-row input { width: 16px; height: 16px; margin: 0; }
 .field-help { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 400; }
 .dialog-note { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .form-error { margin: 12px 0 0; padding: 10px 11px; border-left: 3px solid var(--coral); background: var(--coral-soft); color: #793225; font-size: 12px; line-height: 1.45; }

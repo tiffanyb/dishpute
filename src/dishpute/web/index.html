@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.9" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.10" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.9" defer></script>
+    <script src="/assets/app.js?v=20260902.10" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -60,6 +60,7 @@
             <h2 id="week-title">This week</h2>
           </div>
           <div class="date-controls">
+            <button class="primary-button" id="record-work-button" type="button"><i data-lucide="check-circle-2"></i>Record work</button>
             <button class="text-button" id="today-button" type="button">Today</button>
             <div class="button-group">
               <button class="icon-button" id="previous-week" type="button" title="Previous week">
@@ -271,6 +272,37 @@
         <div class="dialog-actions">
           <button class="text-button" id="cancel-schedule" type="button">Cancel</button>
           <button class="primary-button" id="save-schedule-button" type="submit">Reserve time</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="completed-work-dialog">
+      <form id="completed-work-form">
+        <div class="dialog-header">
+          <div><p class="section-kicker">Completed</p><h2>Record work</h2></div>
+          <button class="icon-button" id="close-completed-work" type="button" title="Close"><i data-lucide="x"></i></button>
+        </div>
+        <label>What was done?<input id="completed-work-title" maxlength="300" required /></label>
+        <div class="form-grid">
+          <label>Date<input id="completed-work-date" type="date" required /></label>
+          <label>Category
+            <select id="completed-work-category"><option value="other">Other</option><option value="cleaning">Cleaning</option><option value="cooking">Cooking</option><option value="laundry">Laundry</option><option value="shopping">Shopping</option><option value="planning">Planning</option></select>
+          </label>
+          <label>Start time<input id="completed-work-start" type="time" /></label>
+          <label>End time<input id="completed-work-end" type="time" /></label>
+        </div>
+        <label>Manual duration in minutes <span class="optional-label">optional override</span><input id="completed-work-duration" type="number" min="1" /></label>
+        <div class="form-grid">
+          <label>Scope<select id="completed-work-scope"><option value="household">Household</option><option value="personal">Personal</option></select></label>
+          <label>Fairness<select id="completed-work-fairness"><option value="auto">Automatic</option><option value="include">Include</option><option value="exclude">Do not include</option></select></label>
+        </div>
+        <label>Related task <span class="optional-label">optional</span><select id="completed-work-task"><option value="">None</option></select></label>
+        <label class="checkbox-row"><input id="completed-work-complete-task" type="checkbox" />Also mark the related Task completed</label>
+        <fieldset><legend>Completed by</legend><div class="participant-options" id="completed-work-participants"></div></fieldset>
+        <p class="form-error hidden" id="completed-work-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="text-button" id="cancel-completed-work" type="button">Cancel</button>
+          <button class="primary-button" id="save-completed-work" type="submit">Record work</button>
         </div>
       </form>
     </dialog>

@@ -16,6 +16,8 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Reserved time" in page.text
     assert "Cancel task" in page.text
     assert "Reserve time" in page.text
+    assert "Completed by" in page.text
+    assert "Manual duration" in page.text
     assert "Sign in to Dishpute" in page.text
     assert "auth-error" in page.text
     assert "Use at least 10 characters" in page.text
@@ -35,3 +37,4 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "createTask" in script.text
     assert "updateSelectedTaskLifecycle" in script.text
     assert "scheduleSelectedTask" in script.text
+    assert "recordCompletedWork" in script.text

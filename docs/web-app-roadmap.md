@@ -40,12 +40,12 @@ complete.
 
 ### Completed work
 
-- [ ] Record completed work without requiring an existing Task.
-- [ ] Capture start and end times or a manually entered duration.
-- [ ] Select one or multiple members under `Completed by`.
-- [ ] Optionally associate completed work with an existing Task.
-- [ ] Control whether completed work counts toward household fairness.
-- [ ] Optionally mark the associated Task completed.
+- [x] Record completed work without requiring an existing Task.
+- [x] Capture start and end times or a manually entered duration.
+- [x] Select one or multiple members under `Completed by`.
+- [x] Optionally associate completed work with an existing Task.
+- [x] Control whether completed work counts toward household fairness.
+- [x] Optionally mark the associated Task completed.
 
 ### Calendar
 
