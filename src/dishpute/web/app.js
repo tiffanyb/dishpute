@@ -1,6 +1,8 @@
 const state = {
+  accessToken: localStorage.getItem("dishpute.accessToken") || "",
   householdId: localStorage.getItem("dishpute.householdId") || "",
-  userId: localStorage.getItem("dishpute.userId") || "",
+  userId: "",
+  displayName: "",
   members: [],
   calendarItems: [],
   workItems: [],
@@ -47,8 +49,11 @@ function participantNames(ids) {
   return ids.map((id) => memberById(id)?.display_name || "Member").join(" + ");
 }
 
-async function api(path) {
-  const response = await fetch(path, { headers: { "X-Actor-User-Id": state.userId } });
+async function api(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (state.accessToken) headers.Authorization = `Bearer ${state.accessToken}`;
+  if (options.body) headers["Content-Type"] = "application/json";
+  const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || `Dishpute returned ${response.status}`);
@@ -56,8 +61,34 @@ async function api(path) {
   return response.json();
 }
 
+async function bootstrap() {
+  if (!state.accessToken) {
+    showConnectionState();
+    return;
+  }
+  try {
+    const profile = await api("/me");
+    state.userId = profile.user_id;
+    state.displayName = profile.display_name;
+    const selected = profile.households.find((item) => item.id === state.householdId)
+      || profile.households[0];
+    if (!selected) {
+      showConnectionState();
+      $("#household-timezone").value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      $("#household-dialog").showModal();
+      return;
+    }
+    state.householdId = selected.id;
+    localStorage.setItem("dishpute.householdId", state.householdId);
+    await loadAll();
+  } catch (error) {
+    signOut();
+    showToast(error.message);
+  }
+}
+
 async function loadAll() {
-  if (!state.householdId || !state.userId) {
+  if (!state.householdId || !state.accessToken) {
     showConnectionState();
     return;
   }
@@ -91,8 +122,8 @@ function setLoading(loading) {
 
 function renderHeader() {
   const current = memberById(state.userId);
-  $("#profile-name").textContent = current?.display_name || "Connected";
-  $("#profile-initial").textContent = (current?.display_name || "D").charAt(0).toUpperCase();
+  $("#profile-name").textContent = current?.display_name || state.displayName;
+  $("#profile-initial").textContent = (current?.display_name || state.displayName || "D").charAt(0).toUpperCase();
   $("#household-label").textContent = `${state.members.length} household member${state.members.length === 1 ? "" : "s"}`;
   $("#member-legend").innerHTML = state.members.map((member, index) => `
     <span class="member-chip" style="--member-color:${memberColors[index % memberColors.length]}">
@@ -192,9 +223,28 @@ function switchView(view) {
 }
 
 function openConnectionDialog() {
-  $("#household-id").value = state.householdId;
-  $("#user-id").value = state.userId;
   $("#connection-dialog").showModal();
+}
+
+function signOut() {
+  state.accessToken = "";
+  state.householdId = "";
+  state.userId = "";
+  localStorage.removeItem("dishpute.accessToken");
+  localStorage.removeItem("dishpute.householdId");
+  $("#account-dialog").close();
+  showConnectionState();
+}
+
+function setAuthMode(mode) {
+  const signup = mode === "signup";
+  $$("#auth-mode button").forEach((button) => button.classList.toggle("active", button.dataset.authMode === mode));
+  $$(".signup-field").forEach((field) => field.classList.toggle("hidden", !signup));
+  $("#display-name").required = signup;
+  $("#password").autocomplete = signup ? "new-password" : "current-password";
+  $("#auth-title").textContent = signup ? "Create your account" : "Sign in to Dishpute";
+  $("#save-connection").textContent = signup ? "Create account" : "Sign in";
+  $("#connection-form").dataset.mode = mode;
 }
 
 function showToast(message) {
@@ -210,7 +260,12 @@ function escapeHtml(value) {
 
 function bindEvents() {
   $$(".view-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
-  $("#connection-button").addEventListener("click", openConnectionDialog);
+  $("#connection-button").addEventListener("click", () => {
+    if (!state.accessToken) return openConnectionDialog();
+    $("#account-name").textContent = state.displayName;
+    $("#invite-result").classList.add("hidden");
+    $("#account-dialog").showModal();
+  });
   $("#empty-connect-button").addEventListener("click", openConnectionDialog);
   $("#refresh-button").addEventListener("click", loadAll);
   $("#today-button").addEventListener("click", () => { state.weekStart = startOfWeek(new Date()); loadAll(); });
@@ -222,20 +277,55 @@ function bindEvents() {
     $$("#task-filters button").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
     renderTasks();
   }));
-  $("#connection-form").addEventListener("submit", (event) => {
-    if (event.submitter?.value === "cancel") return;
+  $("#close-auth-dialog").addEventListener("click", () => $("#connection-dialog").close());
+  $("#close-account-dialog").addEventListener("click", () => $("#account-dialog").close());
+  $("#sign-out-button").addEventListener("click", signOut);
+  $$("#auth-mode button").forEach((button) => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
+  $("#connection-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    state.householdId = $("#household-id").value.trim();
-    state.userId = $("#user-id").value.trim();
-    localStorage.setItem("dishpute.householdId", state.householdId);
-    localStorage.setItem("dishpute.userId", state.userId);
-    $("#connection-dialog").close();
-    loadAll();
+    const signup = event.currentTarget.dataset.mode === "signup";
+    const body = { email: $("#email").value, password: $("#password").value };
+    if (signup) body.display_name = $("#display-name").value;
+    try {
+      const result = await api(signup ? "/auth/signup" : "/auth/login", { method: "POST", body: JSON.stringify(body) });
+      state.accessToken = result.access_token;
+      localStorage.setItem("dishpute.accessToken", state.accessToken);
+      $("#connection-dialog").close();
+      await bootstrap();
+    } catch (error) { showToast(error.message); }
+  });
+  $("#create-household-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const household = await api("/households", { method: "POST", body: JSON.stringify({ name: $("#household-name").value, default_timezone: $("#household-timezone").value }) });
+      state.householdId = household.id;
+      localStorage.setItem("dishpute.householdId", household.id);
+      $("#household-dialog").close();
+      await bootstrap();
+    } catch (error) { showToast(error.message); }
+  });
+  $("#join-household-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const household = await api("/households/join", { method: "POST", body: JSON.stringify({ invite_code: $("#invite-code").value }) });
+      state.householdId = household.id;
+      localStorage.setItem("dishpute.householdId", household.id);
+      $("#household-dialog").close();
+      await bootstrap();
+    } catch (error) { showToast(error.message); }
+  });
+  $("#create-invite-button").addEventListener("click", async () => {
+    try {
+      const result = await api(`/households/${state.householdId}/invites`, { method: "POST" });
+      $("#generated-invite").textContent = result.invite_code;
+      $("#invite-result").classList.remove("hidden");
+    } catch (error) { showToast(error.message); }
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
+  setAuthMode("login");
   if (window.lucide) window.lucide.createIcons();
-  loadAll();
+  bootstrap();
 });

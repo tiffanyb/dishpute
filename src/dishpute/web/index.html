@@ -87,40 +87,74 @@
       </section>
 
       <section class="empty-state hidden" id="connection-empty-state">
-        <i data-lucide="users"></i>
-        <h2>Connect your household</h2>
-        <p>Enter the local Household and User IDs to load your shared plan.</p>
-        <button class="primary-button" id="empty-connect-button" type="button">Connect</button>
+        <i data-lucide="home"></i>
+        <h2>Your household, in one place</h2>
+        <p>Sign in to see shared plans and completed work.</p>
+        <button class="primary-button" id="empty-connect-button" type="button">Sign in</button>
       </section>
     </main>
 
     <dialog id="connection-dialog">
-      <form method="dialog" id="connection-form">
+      <form id="connection-form">
         <div class="dialog-header">
           <div>
-            <p class="section-kicker">Local development</p>
-            <h2>Connect to Dishpute</h2>
+            <p class="section-kicker">Welcome</p>
+            <h2 id="auth-title">Sign in to Dishpute</h2>
           </div>
-          <button class="icon-button" value="cancel" type="submit" title="Close">
+          <button class="icon-button" id="close-auth-dialog" type="button" title="Close">
             <i data-lucide="x"></i>
           </button>
         </div>
-        <label>
-          Household ID
-          <input id="household-id" name="household-id" autocomplete="off" required />
+        <div class="segmented-control auth-mode" id="auth-mode">
+          <button class="active" data-auth-mode="login" type="button">Sign in</button>
+          <button data-auth-mode="signup" type="button">Create account</button>
+        </div>
+        <label class="signup-field hidden">
+          Your name
+          <input id="display-name" autocomplete="name" />
         </label>
         <label>
-          Your User ID
-          <input id="user-id" name="user-id" autocomplete="off" required />
+          Email
+          <input id="email" type="email" autocomplete="email" required />
         </label>
-        <p class="dialog-note">OAuth sign-in will replace these IDs before public deployment.</p>
+        <label>
+          Password
+          <input id="password" type="password" autocomplete="current-password" required />
+        </label>
         <div class="dialog-actions">
-          <button class="text-button" value="cancel" type="submit">Cancel</button>
-          <button class="primary-button" id="save-connection" value="default" type="submit">
-            Connect
-          </button>
+          <button class="primary-button" id="save-connection" type="submit">Sign in</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="household-dialog">
+      <div class="dialog-header">
+        <div><p class="section-kicker">One more step</p><h2>Set up your household</h2></div>
+      </div>
+      <div class="setup-options">
+        <form id="create-household-form">
+          <h3>Create a household</h3>
+          <label>Household name<input id="household-name" required /></label>
+          <label>Time zone<input id="household-timezone" required /></label>
+          <button class="primary-button" type="submit">Create household</button>
+        </form>
+        <div class="setup-divider">or</div>
+        <form id="join-household-form">
+          <h3>Join your family</h3>
+          <label>Invite code<input id="invite-code" required /></label>
+          <button class="primary-button" type="submit">Join household</button>
+        </form>
+      </div>
+    </dialog>
+
+    <dialog id="account-dialog">
+      <div class="dialog-header">
+        <div><p class="section-kicker">Account</p><h2 id="account-name">Dishpute member</h2></div>
+        <button class="icon-button" id="close-account-dialog" type="button" title="Close"><i data-lucide="x"></i></button>
+      </div>
+      <button class="primary-button" id="create-invite-button" type="button">Create family invite</button>
+      <div class="invite-result hidden" id="invite-result"><span>Invite code</span><strong id="generated-invite"></strong></div>
+      <div class="dialog-actions"><button class="text-button" id="sign-out-button" type="button">Sign out</button></div>
     </dialog>
 
     <dialog id="item-dialog">

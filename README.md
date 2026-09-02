@@ -31,9 +31,8 @@ The readable database definition is [the SQLAlchemy model file](src/dishpute/mod
 Start the local server with `make api-dev`. Open `http://127.0.0.1:8000/` for the
 Dishpute web app or `http://127.0.0.1:8000/docs` for the interactive API contract.
 
-The API supports email signup and login with Argon2 password hashing, bearer sessions,
-household creation, and expiring single-use household invitations. The current web
-connection dialog still uses local IDs; its sign-in experience is the next UI step.
+The API and web app support email signup and login with Argon2 password hashing,
+bearer sessions, household creation, and expiring single-use household invitations.
 
 The initial routes are:
 

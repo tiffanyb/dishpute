@@ -9,8 +9,13 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert page.status_code == 200
     assert "Calendar" in page.text
     assert "Tasks" in page.text
+    assert "Sign in to Dishpute" in page.text
+    assert "Set up your household" in page.text
+    assert "Create family invite" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
     assert script.status_code == 200
     assert "calendar-items" in script.text
     assert "work-items" in script.text
+    assert 'localStorage.getItem("dishpute.accessToken")' in script.text
+    assert 'api("/households/join"' in script.text

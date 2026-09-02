@@ -136,6 +136,16 @@ dialog input { width: 100%; height: 42px; margin-top: 7px; padding: 0 11px; bord
 dialog input:focus { outline: 2px solid var(--green-soft); border-color: var(--green); }
 .dialog-note { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .dialog-actions { justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.auth-mode { margin-bottom: 18px; }
+.auth-mode button { flex: 1; }
+.setup-options form { padding: 2px 0 18px; }
+.setup-options h3 { margin: 0 0 8px; font-size: 15px; }
+.setup-options .primary-button { margin-top: 16px; }
+.setup-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.setup-divider::before, .setup-divider::after { content: ""; height: 1px; background: var(--line); flex: 1; }
+.invite-result { margin-top: 16px; padding: 12px; background: var(--green-soft); border-radius: 6px; }
+.invite-result span { display: block; color: var(--muted); font-size: 11px; }
+.invite-result strong { display: block; margin-top: 5px; overflow-wrap: anywhere; }
 .item-details { display: grid; grid-template-columns: 120px 1fr; gap: 13px; margin: 0; }
 .item-details dt { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .item-details dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
