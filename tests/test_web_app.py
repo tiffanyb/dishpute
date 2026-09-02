@@ -12,6 +12,7 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Sign in to Dishpute" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
+    assert "/assets/app.js?v=" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
     assert script.status_code == 200

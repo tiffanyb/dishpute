@@ -247,6 +247,30 @@ function setAuthMode(mode) {
   $("#connection-form").dataset.mode = mode;
 }
 
+async function createHousehold() {
+  const form = $("#create-household-form");
+  if (!form.reportValidity()) return;
+  try {
+    const household = await api("/households", { method: "POST", body: JSON.stringify({ name: $("#household-name").value, default_timezone: $("#household-timezone").value }) });
+    state.householdId = household.id;
+    localStorage.setItem("dishpute.householdId", household.id);
+    $("#household-dialog").close();
+    await bootstrap();
+  } catch (error) { showToast(error.message); }
+}
+
+async function joinHousehold() {
+  const form = $("#join-household-form");
+  if (!form.reportValidity()) return;
+  try {
+    const household = await api("/households/join", { method: "POST", body: JSON.stringify({ invite_code: $("#invite-code").value }) });
+    state.householdId = household.id;
+    localStorage.setItem("dishpute.householdId", household.id);
+    $("#household-dialog").close();
+    await bootstrap();
+  } catch (error) { showToast(error.message); }
+}
+
 function showToast(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -296,23 +320,11 @@ function bindEvents() {
   });
   $("#create-household-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    try {
-      const household = await api("/households", { method: "POST", body: JSON.stringify({ name: $("#household-name").value, default_timezone: $("#household-timezone").value }) });
-      state.householdId = household.id;
-      localStorage.setItem("dishpute.householdId", household.id);
-      $("#household-dialog").close();
-      await bootstrap();
-    } catch (error) { showToast(error.message); }
+    await createHousehold();
   });
   $("#join-household-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    try {
-      const household = await api("/households/join", { method: "POST", body: JSON.stringify({ invite_code: $("#invite-code").value }) });
-      state.householdId = household.id;
-      localStorage.setItem("dishpute.householdId", household.id);
-      $("#household-dialog").close();
-      await bootstrap();
-    } catch (error) { showToast(error.message); }
+    await joinHousehold();
   });
   $("#create-invite-button").addEventListener("click", async () => {
     try {

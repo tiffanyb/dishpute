@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260902.2" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js" defer></script>
+    <script src="/assets/app.js?v=20260902.2" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -136,13 +136,13 @@
           <h3>Create a household</h3>
           <label>Household name<input id="household-name" required /></label>
           <label>Time zone<input id="household-timezone" required /></label>
-          <button class="primary-button" type="submit">Create household</button>
+          <button class="primary-button" id="create-household-button" type="button" onclick="createHousehold()">Create household</button>
         </form>
         <div class="setup-divider">or</div>
         <form id="join-household-form">
           <h3>Join your family</h3>
           <label>Invite code<input id="invite-code" required /></label>
-          <button class="primary-button" type="submit">Join household</button>
+          <button class="primary-button" id="join-household-button" type="button" onclick="joinHousehold()">Join household</button>
         </form>
       </div>
     </dialog>
