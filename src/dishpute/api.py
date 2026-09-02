@@ -4,11 +4,12 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, Query, Request, status
+from fastapi import Depends, FastAPI, Header, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from dishpute.database import build_engine, build_session_factory
+from dishpute.idempotency import execute_idempotent
 from dishpute.models import Household
 from dishpute.natural_language import NaturalLanguageError, interpret
 from dishpute.schemas import (
@@ -42,6 +43,9 @@ def get_session() -> Iterator[Session]:
 
 
 ActorUserId = Annotated[UUID, Header(alias="X-Actor-User-Id")]
+IdempotencyKey = Annotated[
+    str, Header(alias="Idempotency-Key", min_length=1, max_length=200)
+]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
@@ -74,65 +78,87 @@ def natural_language_route(
     household_id: UUID,
     payload: NaturalLanguageCreate,
     actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
     session: DatabaseSession,
+    response: Response,
 ) -> NaturalLanguageResponse:
     with session.begin():
         household = session.get(Household, household_id)
         if household is None:
             raise ApplicationError("Household was not found")
 
-        command = interpret(
-            payload.text,
-            reference_date=payload.reference_date,
-            timezone_name=household.default_timezone,
-        )
-        if command.action == "record_completed_work":
-            result = record_completed_work(
+        def perform_action() -> NaturalLanguageResponse:
+            command = interpret(
+                payload.text,
+                reference_date=payload.reference_date,
+                timezone_name=household.default_timezone,
+            )
+            if command.action == "record_completed_work":
+                result = record_completed_work(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    category=command.category,
+                    description=command.title,
+                    participant_user_ids=[actor_user_id],
+                    started_at=command.started_at,
+                    ended_at=command.ended_at,
+                    duration_override_minutes=None,
+                )
+                completed_work = CompletedWorkResponse(
+                    completion_record_id=result.completion.id,
+                    time_block_id=(
+                        result.time_block.id if result.time_block is not None else None
+                    ),
+                    task_id=result.completion.task_id,
+                    participant_user_ids=result.participant_user_ids,
+                    effective_duration_minutes=result.effective_duration_minutes,
+                )
+                return NaturalLanguageResponse(
+                    interpreted_action=command.action,
+                    completed_work=completed_work,
+                )
+
+            result = create_task(
                 session,
                 household_id=household_id,
                 actor_user_id=actor_user_id,
+                title=command.title,
                 category=command.category,
-                description=command.title,
-                participant_user_ids=[actor_user_id],
-                started_at=command.started_at,
-                ended_at=command.ended_at,
-                duration_override_minutes=None,
+                participant_user_ids=(
+                    [actor_user_id] if command.started_at is not None else []
+                ),
+                parent_task_id=payload.parent_task_id,
+                scheduled_start=command.started_at,
+                scheduled_end=command.ended_at,
             )
-            completed_work = CompletedWorkResponse(
-                completion_record_id=result.completion.id,
-                time_block_id=result.time_block.id if result.time_block is not None else None,
-                task_id=result.completion.task_id,
+            task = TaskResponse(
+                id=result.task.id,
+                household_id=result.task.household_id,
+                title=result.task.title,
+                description=result.task.description,
+                category=result.task.category,
+                lifecycle_status=result.task.lifecycle_status,
+                parent_task_id=result.task.parent_task_id,
                 participant_user_ids=result.participant_user_ids,
-                effective_duration_minutes=result.effective_duration_minutes,
+                time_block_id=(
+                    result.time_block.id if result.time_block is not None else None
+                ),
             )
-            return NaturalLanguageResponse(
-                interpreted_action=command.action,
-                completed_work=completed_work,
-            )
+            return NaturalLanguageResponse(interpreted_action=command.action, task=task)
 
-        result = create_task(
+        result, replayed = execute_idempotent(
             session,
             household_id=household_id,
             actor_user_id=actor_user_id,
-            title=command.title,
-            category=command.category,
-            participant_user_ids=[actor_user_id] if command.started_at is not None else [],
-            parent_task_id=payload.parent_task_id,
-            scheduled_start=command.started_at,
-            scheduled_end=command.ended_at,
+            idempotency_key=idempotency_key,
+            operation="interpret_natural_language",
+            payload=payload,
+            response_model=NaturalLanguageResponse,
+            action=perform_action,
         )
-        task = TaskResponse(
-            id=result.task.id,
-            household_id=result.task.household_id,
-            title=result.task.title,
-            description=result.task.description,
-            category=result.task.category,
-            lifecycle_status=result.task.lifecycle_status,
-            parent_task_id=result.task.parent_task_id,
-            participant_user_ids=result.participant_user_ids,
-            time_block_id=result.time_block.id if result.time_block is not None else None,
-        )
-        return NaturalLanguageResponse(interpreted_action=command.action, task=task)
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
 
 
 @app.post(
@@ -144,26 +170,44 @@ def create_task_route(
     household_id: UUID,
     payload: TaskCreate,
     actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
     session: DatabaseSession,
+    response: Response,
 ) -> TaskResponse:
     with session.begin():
-        result = create_task(
+        def perform_action() -> TaskResponse:
+            created = create_task(
+                session,
+                household_id=household_id,
+                actor_user_id=actor_user_id,
+                **payload.model_dump(),
+            )
+            return TaskResponse(
+                id=created.task.id,
+                household_id=created.task.household_id,
+                title=created.task.title,
+                description=created.task.description,
+                category=created.task.category,
+                lifecycle_status=created.task.lifecycle_status,
+                parent_task_id=created.task.parent_task_id,
+                participant_user_ids=created.participant_user_ids,
+                time_block_id=(
+                    created.time_block.id if created.time_block is not None else None
+                ),
+            )
+
+        result, replayed = execute_idempotent(
             session,
             household_id=household_id,
             actor_user_id=actor_user_id,
-            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            operation="create_task",
+            payload=payload,
+            response_model=TaskResponse,
+            action=perform_action,
         )
-    return TaskResponse(
-        id=result.task.id,
-        household_id=result.task.household_id,
-        title=result.task.title,
-        description=result.task.description,
-        category=result.task.category,
-        lifecycle_status=result.task.lifecycle_status,
-        parent_task_id=result.task.parent_task_id,
-        participant_user_ids=result.participant_user_ids,
-        time_block_id=result.time_block.id if result.time_block is not None else None,
-    )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
 
 
 @app.post(
@@ -175,22 +219,40 @@ def record_completed_work_route(
     household_id: UUID,
     payload: CompletedWorkCreate,
     actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
     session: DatabaseSession,
+    response: Response,
 ) -> CompletedWorkResponse:
     with session.begin():
-        result = record_completed_work(
+        def perform_action() -> CompletedWorkResponse:
+            recorded = record_completed_work(
+                session,
+                household_id=household_id,
+                actor_user_id=actor_user_id,
+                **payload.model_dump(),
+            )
+            return CompletedWorkResponse(
+                completion_record_id=recorded.completion.id,
+                time_block_id=(
+                    recorded.time_block.id if recorded.time_block is not None else None
+                ),
+                task_id=recorded.completion.task_id,
+                participant_user_ids=recorded.participant_user_ids,
+                effective_duration_minutes=recorded.effective_duration_minutes,
+            )
+
+        result, replayed = execute_idempotent(
             session,
             household_id=household_id,
             actor_user_id=actor_user_id,
-            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            operation="record_completed_work",
+            payload=payload,
+            response_model=CompletedWorkResponse,
+            action=perform_action,
         )
-    return CompletedWorkResponse(
-        completion_record_id=result.completion.id,
-        time_block_id=result.time_block.id if result.time_block is not None else None,
-        task_id=result.completion.task_id,
-        participant_user_ids=result.participant_user_ids,
-        effective_duration_minutes=result.effective_duration_minutes,
-    )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
 
 
 @app.get(

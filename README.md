@@ -42,3 +42,7 @@ end-to-end test surface, not yet a general AI interpreter. A model-backed interp
 can replace it without changing the Application API's household rules.
 
 During this first development stage, the authenticated caller is represented by the `X-Actor-User-Id` header. OAuth will replace this temporary mechanism before the API is publicly exposed.
+
+Every write also requires an `Idempotency-Key` header. Retrying the same request with
+the same key returns the original response without creating duplicate records. A key
+must not be reused for different request content.

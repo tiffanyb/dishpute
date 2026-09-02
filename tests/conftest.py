@@ -20,7 +20,11 @@ def session() -> Iterator[Session]:
     engine = create_engine(DATABASE_URL)
     connection = engine.connect()
     transaction = connection.begin()
-    database_session = Session(bind=connection, expire_on_commit=False)
+    database_session = Session(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
 
     try:
         yield database_session
@@ -40,4 +44,3 @@ def api_client(session: Session) -> Iterator[TestClient]:
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
-

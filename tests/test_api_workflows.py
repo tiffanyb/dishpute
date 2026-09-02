@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -11,6 +11,7 @@ from dishpute.models import (
     CompletionRecord,
     Household,
     HouseholdMembership,
+    IntegrationRequest,
     Task,
     TimeBlock,
 )
@@ -35,8 +36,11 @@ def create_family(session: Session) -> tuple[Household, AppUser, AppUser]:
     return household, tiffany, husband
 
 
-def actor_headers(user_id: UUID) -> dict[str, str]:
-    return {"X-Actor-User-Id": str(user_id)}
+def actor_headers(user_id: UUID, idempotency_key: str | None = None) -> dict[str, str]:
+    return {
+        "X-Actor-User-Id": str(user_id),
+        "Idempotency-Key": idempotency_key or str(uuid4()),
+    }
 
 
 def test_tiffany_records_kitchen_work_that_just_happened(
@@ -255,3 +259,80 @@ def test_tiffany_adds_unscheduled_subtask_using_natural_language(
     assert child["parent_task_id"] == parent_id
     assert child["participant_user_ids"] == []
     assert child["time_block_id"] is None
+
+
+def test_retried_natural_language_request_does_not_duplicate_work(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+    headers = actor_headers(tiffany.id, "cleaned-kitchen-once")
+    request_body = {
+        "text": "I just cleaned the kitchen 10:00 to 11:00",
+        "reference_date": "2026-09-08",
+    }
+
+    first_response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=headers,
+        json=request_body,
+    )
+    replay_response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=headers,
+        json=request_body,
+    )
+
+    assert first_response.status_code == 201
+    assert first_response.headers["Idempotency-Replayed"] == "false"
+    assert replay_response.status_code == 201
+    assert replay_response.headers["Idempotency-Replayed"] == "true"
+    assert replay_response.json() == first_response.json()
+    assert session.scalar(select(func.count()).select_from(CompletionRecord)) == 1
+    assert session.scalar(select(func.count()).select_from(TimeBlock)) == 1
+    assert session.scalar(select(func.count()).select_from(IntegrationRequest)) == 1
+
+    contributions = api_client.get(
+        f"/households/{household.id}/contributions",
+        headers=actor_headers(tiffany.id),
+    ).json()
+    assert contributions[0]["duration_minutes"] == 60
+
+
+def test_idempotency_key_cannot_be_reused_for_different_content(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+    headers = actor_headers(tiffany.id, "one-request-only")
+
+    first_response = api_client.post(
+        f"/households/{household.id}/tasks",
+        headers=headers,
+        json={"title": "Clean the kitchen"},
+    )
+    conflict_response = api_client.post(
+        f"/households/{household.id}/tasks",
+        headers=headers,
+        json={"title": "Clean the bathroom"},
+    )
+
+    assert first_response.status_code == 201
+    assert conflict_response.status_code == 409
+    assert conflict_response.json() == {
+        "detail": "This Idempotency-Key was already used for a different request"
+    }
+    assert session.scalar(select(func.count()).select_from(Task)) == 1
+
+
+def test_write_requires_an_idempotency_key(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+
+    response = api_client.post(
+        f"/households/{household.id}/tasks",
+        headers={"X-Actor-User-Id": str(tiffany.id)},
+        json={"title": "Clean the kitchen"},
+    )
+
+    assert response.status_code == 422
+    assert session.scalar(select(func.count()).select_from(Task)) == 0

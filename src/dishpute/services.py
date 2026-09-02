@@ -30,6 +30,10 @@ class RecordNotFoundError(ApplicationError):
     status_code = 404
 
 
+class ConflictError(ApplicationError):
+    status_code = 409
+
+
 @dataclass(frozen=True)
 class CreatedTask:
     task: Task

@@ -623,6 +623,7 @@ class IntegrationRequest(Base):
     client_name: Mapped[str] = mapped_column(Text)
     idempotency_key: Mapped[str] = mapped_column(Text)
     operation: Mapped[str] = mapped_column(Text)
+    request_hash: Mapped[str] = mapped_column(String(64))
     response_status: Mapped[int | None] = mapped_column(Integer)
     response_body: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
@@ -645,6 +646,7 @@ class IntegrationRequest(Base):
         CheckConstraint("length(trim(client_name)) > 0", name="integration_client_name_present"),
         CheckConstraint("length(trim(idempotency_key)) > 0", name="integration_key_present"),
         CheckConstraint("length(trim(operation)) > 0", name="integration_operation_present"),
+        CheckConstraint("length(request_hash) = 64", name="integration_request_hash_valid"),
         CheckConstraint(
             "response_status IS NULL OR response_status BETWEEN 100 AND 599",
             name="integration_response_status_valid",
