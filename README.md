@@ -10,6 +10,7 @@ The project is currently being developed from the database upward. See [the arch
 - Alembic database migrations
 - PostgreSQL development environment
 - Python model and database-integrity tests
+- Client-neutral MCP Gateway for Codex, Claude, and ChatGPT
 
 The first Application API supports creating and scheduling Tasks, recording completed work, creating Subtasks, and reading contribution duration. Remote MCP Gateway and Web App implementation will follow.
 
@@ -71,3 +72,26 @@ During this first development stage, the authenticated caller is represented by 
 Every write also requires an `Idempotency-Key` header. Retrying the same request with
 the same key returns the original response without creating duplicate records. A key
 must not be reused for different request content.
+
+## MCP Gateway
+
+The MCP Gateway exposes Dishpute actions as standard Streamable HTTP tools. It is
+client-neutral: Codex, Claude, and ChatGPT can use the same gateway once it is hosted
+at a public HTTPS address and protected by OAuth.
+
+For local development, first run the Application API. In a second terminal, provide
+the local member context and start the gateway:
+
+```bash
+DISHPUTE_API_URL=http://127.0.0.1:8000 \
+DISHPUTE_HOUSEHOLD_ID=<household-id> \
+DISHPUTE_USER_ID=<user-id> \
+DISHPUTE_TIMEZONE=America/Phoenix \
+make mcp-dev
+```
+
+The local MCP endpoint is `http://127.0.0.1:8001/mcp`. The available tools record
+completed work, create and update Tasks, schedule or move Time Blocks, explicitly
+complete Tasks, and read the Calendar and unified work-item feed. Local IDs in
+environment variables are temporary; the remote gateway will derive member context
+from OAuth instead.

@@ -9,10 +9,13 @@ POSTGRES_PORT ?= 5432
 DATABASE_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1:$(POSTGRES_PORT)/$(POSTGRES_DB)
 TEST_DATABASE_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1:$(POSTGRES_PORT)/dishpute_python_test
 
-.PHONY: api-dev db-up db-down db-migrate db-test
+.PHONY: api-dev db-up db-down db-migrate db-test mcp-dev
 
 api-dev:
 	DATABASE_URL="$(DATABASE_URL)" uv run uvicorn dishpute.api:app --reload --host 127.0.0.1 --port 8000
+
+mcp-dev:
+	uv run dishpute-mcp
 
 db-up:
 	docker compose up -d database
