@@ -9,10 +9,14 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from dishpute.database import build_engine, build_session_factory
+from dishpute.models import Household
+from dishpute.natural_language import NaturalLanguageError, interpret
 from dishpute.schemas import (
     CompletedWorkCreate,
     CompletedWorkResponse,
     ContributionResponse,
+    NaturalLanguageCreate,
+    NaturalLanguageResponse,
     TaskCreate,
     TaskResponse,
 )
@@ -49,9 +53,86 @@ def handle_application_error(_request: Request, error: ApplicationError) -> JSON
     return JSONResponse(status_code=error.status_code, content={"detail": str(error)})
 
 
+@app.exception_handler(NaturalLanguageError)
+def handle_natural_language_error(
+    _request: Request, error: NaturalLanguageError
+) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(error)})
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post(
+    "/households/{household_id}/natural-language",
+    response_model=NaturalLanguageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def natural_language_route(
+    household_id: UUID,
+    payload: NaturalLanguageCreate,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> NaturalLanguageResponse:
+    with session.begin():
+        household = session.get(Household, household_id)
+        if household is None:
+            raise ApplicationError("Household was not found")
+
+        command = interpret(
+            payload.text,
+            reference_date=payload.reference_date,
+            timezone_name=household.default_timezone,
+        )
+        if command.action == "record_completed_work":
+            result = record_completed_work(
+                session,
+                household_id=household_id,
+                actor_user_id=actor_user_id,
+                category=command.category,
+                description=command.title,
+                participant_user_ids=[actor_user_id],
+                started_at=command.started_at,
+                ended_at=command.ended_at,
+                duration_override_minutes=None,
+            )
+            completed_work = CompletedWorkResponse(
+                completion_record_id=result.completion.id,
+                time_block_id=result.time_block.id if result.time_block is not None else None,
+                task_id=result.completion.task_id,
+                participant_user_ids=result.participant_user_ids,
+                effective_duration_minutes=result.effective_duration_minutes,
+            )
+            return NaturalLanguageResponse(
+                interpreted_action=command.action,
+                completed_work=completed_work,
+            )
+
+        result = create_task(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            title=command.title,
+            category=command.category,
+            participant_user_ids=[actor_user_id] if command.started_at is not None else [],
+            parent_task_id=payload.parent_task_id,
+            scheduled_start=command.started_at,
+            scheduled_end=command.ended_at,
+        )
+        task = TaskResponse(
+            id=result.task.id,
+            household_id=result.task.household_id,
+            title=result.task.title,
+            description=result.task.description,
+            category=result.task.category,
+            lifecycle_status=result.task.lifecycle_status,
+            parent_task_id=result.task.parent_task_id,
+            participant_user_ids=result.participant_user_ids,
+            time_block_id=result.time_block.id if result.time_block is not None else None,
+        )
+        return NaturalLanguageResponse(interpreted_action=command.action, task=task)
 
 
 @app.post(
@@ -131,4 +212,3 @@ def list_contributions_route(
         end_date=end_date,
     )
     return [ContributionResponse(**contribution.__dict__) for contribution in contributions]
-

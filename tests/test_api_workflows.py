@@ -181,3 +181,77 @@ def test_joint_workflow_completes_task_and_credits_both_members(
     assert sorted(item["duration_minutes"] for item in contributions) == [60, 60]
     assert session.scalar(select(func.count()).select_from(AuditEvent)) == 5
 
+
+def test_tiffany_records_completed_work_using_natural_language(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+
+    response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=actor_headers(tiffany.id),
+        json={
+            "text": "I just cleaned the kitchen 10:00 to 11:00",
+            "reference_date": "2026-09-05",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["interpreted_action"] == "record_completed_work"
+    assert body["completed_work"]["effective_duration_minutes"] == 60
+    assert body["completed_work"]["participant_user_ids"] == [str(tiffany.id)]
+    assert body["task"] is None
+    assert session.scalar(select(func.count()).select_from(Task)) == 0
+
+
+def test_husband_plans_work_using_natural_language(
+    api_client: TestClient, session: Session
+) -> None:
+    household, _, husband = create_family(session)
+
+    response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=actor_headers(husband.id),
+        json={
+            "text": "I will clean the kitchen 10:00 to 11:00",
+            "reference_date": "2026-09-06",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["interpreted_action"] == "create_task"
+    assert body["task"]["title"] == "Clean the kitchen"
+    assert body["task"]["participant_user_ids"] == [str(husband.id)]
+    assert body["task"]["time_block_id"] is not None
+    assert body["completed_work"] is None
+
+
+def test_tiffany_adds_unscheduled_subtask_using_natural_language(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, husband = create_family(session)
+    parent_response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=actor_headers(husband.id),
+        json={"text": "Host a party", "reference_date": "2026-09-06"},
+    )
+    parent_id = parent_response.json()["task"]["id"]
+
+    child_response = api_client.post(
+        f"/households/{household.id}/natural-language",
+        headers=actor_headers(tiffany.id),
+        json={
+            "text": "Plan for the meal",
+            "reference_date": "2026-09-06",
+            "parent_task_id": parent_id,
+        },
+    )
+
+    assert child_response.status_code == 201
+    child = child_response.json()["task"]
+    assert child["title"] == "Plan for the meal"
+    assert child["parent_task_id"] == parent_id
+    assert child["participant_user_ids"] == []
+    assert child["time_block_id"] is None

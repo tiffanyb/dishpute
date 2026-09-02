@@ -33,6 +33,12 @@ The initial routes are:
 
 - `POST /households/{household_id}/tasks`
 - `POST /households/{household_id}/completed-work`
+- `POST /households/{household_id}/natural-language`
 - `GET /households/{household_id}/contributions`
+
+The natural-language route currently recognizes a deliberately small set of English
+phrases for completed work, planned work, and unscheduled Tasks. It is an early
+end-to-end test surface, not yet a general AI interpreter. A model-backed interpreter
+can replace it without changing the Application API's household rules.
 
 During this first development stage, the authenticated caller is represented by the `X-Actor-User-Id` header. OAuth will replace this temporary mechanism before the API is publicly exposed.

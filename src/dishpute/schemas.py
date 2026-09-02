@@ -81,3 +81,15 @@ class ContributionResponse(ApiModel):
     user_id: UUID
     contribution_day: date
     duration_minutes: int
+
+
+class NaturalLanguageCreate(ApiModel):
+    text: str = Field(min_length=1)
+    reference_date: date
+    parent_task_id: UUID | None = None
+
+
+class NaturalLanguageResponse(ApiModel):
+    interpreted_action: str
+    task: TaskResponse | None = None
+    completed_work: CompletedWorkResponse | None = None
