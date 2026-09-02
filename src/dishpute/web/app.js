@@ -245,6 +245,13 @@ function setAuthMode(mode) {
   $("#auth-title").textContent = signup ? "Create your account" : "Sign in to Dishpute";
   $("#save-connection").textContent = signup ? "Create account" : "Sign in";
   $("#connection-form").dataset.mode = mode;
+  $("#auth-error").classList.add("hidden");
+}
+
+function showAuthError(message) {
+  const error = $("#auth-error");
+  error.textContent = message;
+  error.classList.remove("hidden");
 }
 
 async function createHousehold() {
@@ -310,13 +317,23 @@ function bindEvents() {
     const signup = event.currentTarget.dataset.mode === "signup";
     const body = { email: $("#email").value, password: $("#password").value };
     if (signup) body.display_name = $("#display-name").value;
+    $("#auth-error").classList.add("hidden");
+    $("#save-connection").disabled = true;
     try {
       const result = await api(signup ? "/auth/signup" : "/auth/login", { method: "POST", body: JSON.stringify(body) });
       state.accessToken = result.access_token;
       localStorage.setItem("dishpute.accessToken", state.accessToken);
       $("#connection-dialog").close();
       await bootstrap();
-    } catch (error) { showToast(error.message); }
+    } catch (error) {
+      showAuthError(
+        !signup && error.message === "Invalid email or password"
+          ? "That email and password do not match a Dishpute account. Try again or choose Create account."
+          : error.message,
+      );
+    } finally {
+      $("#save-connection").disabled = false;
+    }
   });
   $("#create-household-form").addEventListener("submit", async (event) => {
     event.preventDefault();

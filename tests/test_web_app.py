@@ -10,6 +10,7 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Calendar" in page.text
     assert "Tasks" in page.text
     assert "Sign in to Dishpute" in page.text
+    assert "auth-error" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
     assert "/assets/app.js?v=" in page.text
@@ -20,3 +21,4 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "work-items" in script.text
     assert 'localStorage.getItem("dishpute.accessToken")' in script.text
     assert 'api("/households/join"' in script.text
+    assert "do not match a Dishpute account" in script.text
