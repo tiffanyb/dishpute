@@ -71,7 +71,8 @@ body[data-theme="competitive"] {
 .brand-lockup h1 { margin: 0; font-family: "DM Serif Display", serif; font-size: 25px; font-weight: 400; }
 .brand-lockup p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
 .header-actions { gap: 10px; }
-.theme-switch button { min-width: 58px; }
+.theme-switch button { min-width: 126px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.theme-switch svg { width: 15px; height: 15px; }
 .member-legend { display: flex; gap: 6px; margin-right: 6px; }
 .member-chip { gap: 6px; color: var(--muted); font-size: 12px; }
 .member-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--member-color); }
