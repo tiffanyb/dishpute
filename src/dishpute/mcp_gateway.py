@@ -13,7 +13,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from dishpute.auth import AuthenticationError
 from dishpute.database import build_engine, build_session_factory
@@ -369,6 +369,18 @@ def build_oauth_mcp() -> FastMCP:
             allowed_origins=[issuer_url],
         ),
     )
+
+    @server.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
+    async def oauth_protected_resource_metadata(_request: Request):
+        return JSONResponse(
+            {
+                "resource": f"{issuer_url}/mcp",
+                "authorization_servers": [f"{issuer_url}/"],
+                "scopes_supported": ["dishpute:read", "dishpute:write"],
+                "bearer_methods_supported": ["header"],
+            },
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
 
     @server.custom_route("/oauth/login", methods=["GET", "POST"])
     async def oauth_login(request: Request):
