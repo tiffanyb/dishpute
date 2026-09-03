@@ -166,7 +166,7 @@ dialog::backdrop { background: rgba(24,28,23,.38); backdrop-filter: blur(2px); }
   line-height: 1.2;
 }
 .dialog-title-input:focus { outline: 0; border-color: transparent; }
-.dialog-title-input::placeholder { color: var(--ink); opacity: 1; }
+.dialog-title-input::placeholder { color: var(--muted); opacity: .9; }
 .time-mode { display: flex; width: max-content; margin-top: 14px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
 .time-mode label { margin: 0; padding: 8px 12px; border-radius: 4px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
 .time-mode label:has(input:checked) { background: var(--ink); color: white; }
