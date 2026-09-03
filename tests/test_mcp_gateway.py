@@ -33,6 +33,7 @@ async def test_mcp_exposes_client_neutral_household_tools() -> None:
         "record_work",
         "record_completed_task",
         "create_task",
+        "create_scheduled_task",
         "list_work_items",
         "list_household_members",
         "get_calendar",
@@ -167,3 +168,57 @@ async def test_record_completed_task_resolves_participant_names() -> None:
     assert isinstance(result, dict)
     assert result["effective_duration_minutes"] == 150
     assert captured["body"]["participant_user_ids"] == [str(USER_ID), str(second_user_id)]
+
+
+@pytest.mark.anyio
+async def test_create_scheduled_task_resolves_participant_names() -> None:
+    second_user_id = uuid4()
+    captured: dict[str, object] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == f"/households/{HOUSEHOLD_ID}/members":
+            return httpx.Response(
+                200,
+                json=[
+                    {"user_id": str(USER_ID), "display_name": "Tiffany"},
+                    {"user_id": str(second_user_id), "display_name": "Zilin"},
+                ],
+            )
+        captured["method"] = request.method
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            201,
+            json={
+                "id": str(uuid4()),
+                "household_id": str(HOUSEHOLD_ID),
+                "title": "Take Alan to piano class",
+                "description": None,
+                "category": "other",
+                "work_scope": "household",
+                "lifecycle_status": "active",
+                "parent_task_id": None,
+                "participant_user_ids": [str(second_user_id), str(USER_ID)],
+                "time_block_id": str(uuid4()),
+            },
+        )
+
+    server = build_mcp(mock_client(httpx.MockTransport(handle)))
+    _content, result = await server.call_tool(
+        "create_scheduled_task",
+        {
+            "title": "Take Alan to piano class",
+            "work_date": date(2026, 9, 3),
+            "start_time": time(17, 0),
+            "end_time": time(18, 0),
+            "participant_names": ["Zilin", "Tiffany"],
+        },
+    )
+
+    assert isinstance(result, dict)
+    assert result["title"] == "Take Alan to piano class"
+    assert captured["method"] == "POST"
+    assert captured["path"] == f"/households/{HOUSEHOLD_ID}/tasks"
+    assert captured["body"]["participant_user_ids"] == [str(second_user_id), str(USER_ID)]
+    assert captured["body"]["scheduled_start"] == "2026-09-03T17:00:00-07:00"
+    assert captured["body"]["scheduled_end"] == "2026-09-03T18:00:00-07:00"

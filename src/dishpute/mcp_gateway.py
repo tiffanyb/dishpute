@@ -160,6 +160,27 @@ def build_mcp(
         openWorldHint=False,
     )
 
+    async def resolve_member_names(names: list[str] | None) -> list[UUID]:
+        if not names:
+            return []
+        members = await client.request("GET", f"/households/{client.active_household_id}/members")
+        members_by_name = {
+            str(member["display_name"]).casefold(): UUID(member["user_id"])
+            for member in members
+        }
+        missing = [name for name in names if name.casefold() not in members_by_name]
+        if missing:
+            raise ValueError("No active household member matched: " + ", ".join(missing))
+        return [members_by_name[name.casefold()] for name in names]
+
+    async def participant_ids_from_values(
+        participant_user_ids: list[UUID] | None,
+        participant_names: list[str] | None,
+    ) -> list[UUID]:
+        return list(
+            dict.fromkeys([*(participant_user_ids or []), *(await resolve_member_names(participant_names))])
+        )
+
     async def record_completed_work(
         *,
         title: str,
@@ -176,29 +197,9 @@ def build_mcp(
         ended_at = client.local_datetime(work_date, end_time)
         if ended_at <= started_at:
             raise ValueError("end_time must be after start_time on the same date")
-        participant_user_ids = completed_by_user_ids or []
-        if completed_by_names:
-            members = await client.request(
-                "GET", f"/households/{client.active_household_id}/members"
-            )
-            members_by_name = {
-                str(member["display_name"]).casefold(): UUID(member["user_id"])
-                for member in members
-            }
-            missing = [
-                name
-                for name in completed_by_names
-                if name.casefold() not in members_by_name
-            ]
-            if missing:
-                raise ValueError(
-                    "No active household member matched: " + ", ".join(missing)
-                )
-            participant_user_ids = [
-                *participant_user_ids,
-                *(members_by_name[name.casefold()] for name in completed_by_names),
-            ]
-        participant_user_ids = list(dict.fromkeys(participant_user_ids))
+        participant_user_ids = await participant_ids_from_values(
+            completed_by_user_ids, completed_by_names
+        )
         return await client.request(
             "POST",
             f"/households/{client.active_household_id}/completed-work",
@@ -273,9 +274,11 @@ def build_mcp(
         category: str = "other",
         work_scope: Literal["household", "personal"] = "household",
         participant_user_ids: list[UUID] | None = None,
+        participant_names: list[str] | None = None,
         parent_task_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Create future or unscheduled work. Do not use this for unmatched work that already happened."""
+        """Create future or unscheduled work. Use participant_names for household member names such as Tiffany or Zilin; do not ask the user for UUIDs."""
+        participant_ids = await participant_ids_from_values(participant_user_ids, participant_names)
         return await client.request(
             "POST",
             f"/households/{client.active_household_id}/tasks",
@@ -285,8 +288,43 @@ def build_mcp(
                 "description": description,
                 "category": category,
                 "work_scope": work_scope,
-                "participant_user_ids": [str(value) for value in (participant_user_ids or [])],
+                "participant_user_ids": [str(value) for value in participant_ids],
                 "parent_task_id": str(parent_task_id) if parent_task_id else None,
+            },
+        )
+
+    @server.tool(annotations=write_tool, structured_output=True)
+    async def create_scheduled_task(
+        title: str,
+        work_date: date,
+        start_time: time,
+        end_time: time,
+        description: str | None = None,
+        category: str = "other",
+        work_scope: Literal["household", "personal"] = "household",
+        participant_user_ids: list[UUID] | None = None,
+        participant_names: list[str] | None = None,
+        parent_task_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Create a future Task and schedule it in one call. Use for requests like 'create a future task for Tiffany and Zilin, 5pm-6pm'; use participant_names instead of asking for UUIDs."""
+        starts_at = client.local_datetime(work_date, start_time)
+        ends_at = client.local_datetime(work_date, end_time)
+        if ends_at <= starts_at:
+            raise ValueError("end_time must be after start_time on the same date")
+        participant_ids = await participant_ids_from_values(participant_user_ids, participant_names)
+        return await client.request(
+            "POST",
+            f"/households/{client.active_household_id}/tasks",
+            write=True,
+            json={
+                "title": title,
+                "description": description,
+                "category": category,
+                "work_scope": work_scope,
+                "participant_user_ids": [str(value) for value in participant_ids],
+                "parent_task_id": str(parent_task_id) if parent_task_id else None,
+                "scheduled_start": starts_at.isoformat(),
+                "scheduled_end": ends_at.isoformat(),
             },
         )
 
