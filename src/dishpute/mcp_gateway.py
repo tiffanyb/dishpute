@@ -370,15 +370,50 @@ def build_oauth_mcp() -> FastMCP:
         ),
     )
 
+    def authorization_server_metadata() -> dict[str, Any]:
+        return {
+            "issuer": f"{issuer_url}/",
+            "authorization_endpoint": f"{issuer_url}/authorize",
+            "token_endpoint": f"{issuer_url}/token",
+            "registration_endpoint": f"{issuer_url}/register",
+            "scopes_supported": ["dishpute:read", "dishpute:write"],
+            "response_types_supported": ["code"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "token_endpoint_auth_methods_supported": [
+                "client_secret_post",
+                "client_secret_basic",
+                "none",
+            ],
+            "revocation_endpoint": f"{issuer_url}/revoke",
+            "revocation_endpoint_auth_methods_supported": [
+                "client_secret_post",
+                "client_secret_basic",
+                "none",
+            ],
+            "code_challenge_methods_supported": ["S256"],
+        }
+
+    def protected_resource_metadata() -> dict[str, Any]:
+        return {
+            "resource": f"{issuer_url}/mcp",
+            "authorization_servers": [f"{issuer_url}/"],
+            "scopes_supported": ["dishpute:read", "dishpute:write"],
+            "bearer_methods_supported": ["header"],
+        }
+
     @server.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
+    @server.custom_route("/mcp/.well-known/oauth-protected-resource", methods=["GET"])
     async def oauth_protected_resource_metadata(_request: Request):
         return JSONResponse(
-            {
-                "resource": f"{issuer_url}/mcp",
-                "authorization_servers": [f"{issuer_url}/"],
-                "scopes_supported": ["dishpute:read", "dishpute:write"],
-                "bearer_methods_supported": ["header"],
-            },
+            protected_resource_metadata(),
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+
+    @server.custom_route("/.well-known/oauth-authorization-server/mcp", methods=["GET"])
+    @server.custom_route("/mcp/.well-known/oauth-authorization-server", methods=["GET"])
+    async def oauth_authorization_server_metadata(_request: Request):
+        return JSONResponse(
+            authorization_server_metadata(),
             headers={"Cache-Control": "public, max-age=3600"},
         )
 
