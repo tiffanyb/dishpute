@@ -126,8 +126,9 @@ def build_mcp(
         "Dishpute",
         instructions=(
             "Manage shared household planning and completed work. Past work should use "
-            "record_work. Future work should use create_task, followed by schedule_task "
-            "when a time is known. 'I' means the authenticated Dishpute member. Personal "
+            "record_work. Future work with a known date and time range should use "
+            "create_scheduled_task. Future work without a known time should use "
+            "create_task. 'I' means the authenticated Dishpute member. Personal "
             "work remains visible to the household but normally does not count toward "
             "household fairness. If the user asks to create, add, log, or record work "
             "with a time range that has already happened, record completed work instead "
@@ -277,7 +278,7 @@ def build_mcp(
         participant_names: list[str] | None = None,
         parent_task_id: UUID | None = None,
     ) -> dict[str, Any]:
-        """Create future or unscheduled work. Use participant_names for household member names such as Tiffany or Zilin; do not ask the user for UUIDs."""
+        """Create future work that does not have a scheduled time yet. Use participant_names for household member names such as Tiffany or Zilin; do not ask the user for UUIDs."""
         participant_ids = await participant_ids_from_values(participant_user_ids, participant_names)
         return await client.request(
             "POST",
