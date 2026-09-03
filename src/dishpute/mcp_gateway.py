@@ -13,7 +13,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from dishpute.auth import AuthenticationError
 from dishpute.database import build_engine, build_session_factory
@@ -401,20 +401,39 @@ def build_oauth_mcp() -> FastMCP:
             "bearer_methods_supported": ["header"],
         }
 
-    @server.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
-    @server.custom_route("/mcp/.well-known/oauth-protected-resource", methods=["GET"])
+    def metadata_headers() -> dict[str, str]:
+        return {
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": (
+                "Accept, Accept-Language, Content-Language, Content-Type, "
+                "MCP-Protocol-Version"
+            ),
+            "Access-Control-Max-Age": "600",
+        }
+
+    def metadata_options_response() -> Response:
+        return Response("OK", headers=metadata_headers())
+
+    @server.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])
+    @server.custom_route("/mcp/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])
     async def oauth_protected_resource_metadata(_request: Request):
+        if _request.method == "OPTIONS":
+            return metadata_options_response()
         return JSONResponse(
             protected_resource_metadata(),
-            headers={"Cache-Control": "public, max-age=3600"},
+            headers=metadata_headers(),
         )
 
-    @server.custom_route("/.well-known/oauth-authorization-server/mcp", methods=["GET"])
-    @server.custom_route("/mcp/.well-known/oauth-authorization-server", methods=["GET"])
+    @server.custom_route("/.well-known/oauth-authorization-server/mcp", methods=["GET", "OPTIONS"])
+    @server.custom_route("/mcp/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
     async def oauth_authorization_server_metadata(_request: Request):
+        if _request.method == "OPTIONS":
+            return metadata_options_response()
         return JSONResponse(
             authorization_server_metadata(),
-            headers={"Cache-Control": "public, max-age=3600"},
+            headers=metadata_headers(),
         )
 
     @server.custom_route("/oauth/login", methods=["GET", "POST"])
