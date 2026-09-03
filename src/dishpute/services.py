@@ -635,6 +635,117 @@ def update_planned_time_block(
     )
 
 
+def _find_completion_record(
+    session: Session, household_id: UUID, completion_record_id: UUID
+) -> CompletionRecord:
+    completion = session.scalar(
+        select(CompletionRecord).where(
+            CompletionRecord.household_id == household_id,
+            CompletionRecord.id == completion_record_id,
+        )
+    )
+    if completion is None:
+        raise RecordNotFoundError("Completed work was not found in this Household")
+    return completion
+
+
+def update_completed_work(
+    session: Session,
+    *,
+    household_id: UUID,
+    actor_user_id: UUID,
+    completion_record_id: UUID,
+    changes: dict[str, object],
+) -> RecordedWork:
+    _require_active_membership(session, household_id, actor_user_id)
+    completion = _find_completion_record(session, household_id, completion_record_id)
+    time_block = (
+        _find_time_block(session, household_id, completion.time_block_id)
+        if completion.time_block_id is not None
+        else None
+    )
+
+    starts_at = changes.get("started_at", completion.started_at)
+    ends_at = changes.get("ended_at", completion.ended_at)
+    if starts_at is not None or ends_at is not None:
+        assert isinstance(starts_at, datetime) and isinstance(ends_at, datetime)
+        if ends_at <= starts_at:
+            raise ApplicationError("ended_at must be after started_at")
+
+    before_values = {
+        field: getattr(completion, field).isoformat()
+        if isinstance(getattr(completion, field), datetime)
+        else getattr(completion, field)
+        for field in changes
+    }
+    if "description" in changes:
+        completion.description = str(changes["description"]).strip()
+        if time_block is not None:
+            time_block.title = completion.description
+    if "started_at" in changes and "ended_at" in changes:
+        assert isinstance(starts_at, datetime) and isinstance(ends_at, datetime)
+        completion.started_at = starts_at
+        completion.ended_at = ends_at
+        completion.completed_at = ends_at
+        completion.duration_override_minutes = None
+        if time_block is not None:
+            time_block.starts_at = starts_at
+            time_block.ends_at = ends_at
+
+    after_values = {
+        field: getattr(completion, field).isoformat()
+        if isinstance(getattr(completion, field), datetime)
+        else getattr(completion, field)
+        for field in changes
+    }
+    _audit(
+        session,
+        household_id,
+        actor_user_id,
+        "update",
+        "completion_record",
+        completion.id,
+        before_values=before_values,
+        after_values=after_values,
+    )
+    session.flush()
+    return RecordedWork(
+        completion=completion,
+        participant_user_ids=_completion_participant_ids(session, completion.id),
+        time_block=time_block,
+        effective_duration_minutes=completion.effective_duration_minutes,
+    )
+
+
+def delete_completed_work(
+    session: Session,
+    *,
+    household_id: UUID,
+    actor_user_id: UUID,
+    completion_record_id: UUID,
+) -> None:
+    _require_active_membership(session, household_id, actor_user_id)
+    completion = _find_completion_record(session, household_id, completion_record_id)
+    time_block = (
+        _find_time_block(session, household_id, completion.time_block_id)
+        if completion.time_block_id is not None
+        else None
+    )
+    _audit(
+        session,
+        household_id,
+        actor_user_id,
+        "delete",
+        "completion_record",
+        completion.id,
+        before_values={"description": completion.description},
+    )
+    session.delete(completion)
+    if time_block is not None:
+        session.delete(time_block)
+    session.flush()
+
+
 def update_task_lifecycle(
     session: Session,
     *,
@@ -826,6 +937,7 @@ def list_calendar_items(
                 TimeBlock.household_id == household_id,
                 TimeBlock.starts_at < starts_before,
                 TimeBlock.ends_at > ends_after,
+                TimeBlock.status != "cancelled",
             )
             .order_by(TimeBlock.starts_at, TimeBlock.id)
         )

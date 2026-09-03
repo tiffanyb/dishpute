@@ -166,6 +166,16 @@ def test_member_can_edit_schedule_reschedule_and_cancel_shared_task_time(
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
+    calendar = api_client.get(
+        f"/households/{household.id}/calendar-items",
+        headers=headers(first_member.id),
+        params={
+            "range_start": "2026-09-10T00:00:00-07:00",
+            "range_end": "2026-09-11T00:00:00-07:00",
+        },
+    )
+    assert calendar.status_code == 200
+    assert calendar.json() == []
     response_statuses = list(
         session.scalars(
             select(IntegrationRequest.response_status)

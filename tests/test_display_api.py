@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from dishpute.models import AppUser, Household, HouseholdMembership
+from dishpute.models import AppUser, CompletionRecord, Household, HouseholdMembership, TimeBlock
 
 
 def create_family(session: Session) -> tuple[Household, AppUser, AppUser]:
@@ -108,6 +108,56 @@ def test_personal_completed_work_appears_in_calendar_and_work_items(
         headers=headers(tiffany.id),
     )
     assert contributions.json() == []
+
+
+def test_completed_work_can_be_edited_and_removed_from_calendar(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+    recorded = api_client.post(
+        f"/households/{household.id}/completed-work",
+        headers=headers(tiffany.id, write=True),
+        json={
+            "category": "cooking",
+            "description": "Cooked lunch",
+            "participant_user_ids": [str(tiffany.id)],
+            "started_at": "2026-09-02T12:00:00-07:00",
+            "ended_at": "2026-09-02T13:00:00-07:00",
+        },
+    )
+    assert recorded.status_code == 201
+
+    updated = api_client.patch(
+        f"/households/{household.id}/completed-work/{recorded.json()['completion_record_id']}",
+        headers=headers(tiffany.id, write=True),
+        json={
+            "description": "Prepared lunch",
+            "started_at": "2026-09-02T12:30:00-07:00",
+            "ended_at": "2026-09-02T13:15:00-07:00",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["effective_duration_minutes"] == 45
+
+    calendar = api_client.get(
+        f"/households/{household.id}/calendar-items",
+        headers=headers(tiffany.id),
+        params={
+            "range_start": "2026-09-02T00:00:00-07:00",
+            "range_end": "2026-09-03T00:00:00-07:00",
+        },
+    ).json()
+    assert calendar[0]["title"] == "Prepared lunch"
+    assert calendar[0]["starts_at"] == "2026-09-02T19:30:00Z"
+    assert calendar[0]["ends_at"] == "2026-09-02T20:15:00Z"
+
+    removed = api_client.delete(
+        f"/households/{household.id}/completed-work/{recorded.json()['completion_record_id']}",
+        headers=headers(tiffany.id),
+    )
+    assert removed.status_code == 204
+    assert session.get(CompletionRecord, UUID(recorded.json()["completion_record_id"])) is None
+    assert session.get(TimeBlock, UUID(recorded.json()["time_block_id"])) is None
 
 
 def test_planned_personal_task_and_members_support_web_app_views(

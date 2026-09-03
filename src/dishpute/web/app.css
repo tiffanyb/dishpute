@@ -251,6 +251,8 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .detail-row:last-child { border-bottom: 0; }
 .danger-button { color: var(--coral); }
 #delete-task-button { margin-right: auto; }
+.item-dialog-actions { border-top: 1px solid var(--line); padding-top: 16px; }
+#remove-calendar-item { margin-right: auto; }
 .task-lifecycle-actions { border-top: 1px solid var(--line); padding-top: 16px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 360px; padding: 12px 16px; background: var(--ink); color: white; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 12px; z-index: 30; }
 

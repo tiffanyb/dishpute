@@ -146,6 +146,7 @@ class TaskScheduleCreate(ApiModel):
 
 
 class TimeBlockUpdate(ApiModel):
+    title: str | None = Field(default=None, min_length=1)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     status: str | None = Field(default=None, pattern="^(planned|cancelled)$")
@@ -154,6 +155,8 @@ class TimeBlockUpdate(ApiModel):
     def validate_changes(self) -> "TimeBlockUpdate":
         if not self.model_fields_set:
             raise ValueError("at least one Time Block field must be provided")
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title cannot be null")
         if (
             self.starts_at is not None
             and self.ends_at is not None
@@ -193,6 +196,28 @@ class CompletedWorkCreate(ApiModel):
             raise ValueError("completed work requires a time range or duration override")
         if self.complete_task and self.task_id is None:
             raise ValueError("complete_task requires task_id")
+        return self
+
+
+class CompletedWorkUpdate(ApiModel):
+    description: str | None = Field(default=None, min_length=1)
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_changes(self) -> "CompletedWorkUpdate":
+        if not self.model_fields_set:
+            raise ValueError("at least one completed work field must be provided")
+        if "description" in self.model_fields_set and self.description is None:
+            raise ValueError("description cannot be null")
+        if (self.started_at is None) != (self.ended_at is None):
+            raise ValueError("started_at and ended_at must be provided together")
+        if (
+            self.started_at is not None
+            and self.ended_at is not None
+            and self.ended_at <= self.started_at
+        ):
+            raise ValueError("ended_at must be after started_at")
         return self
 
 

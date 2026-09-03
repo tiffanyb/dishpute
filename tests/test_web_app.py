@@ -31,10 +31,12 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Use at least 10 characters" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
-    assert "/assets/app.css?v=20260903.7" in page.text
-    assert "/assets/app.js?v=20260903.7" in page.text
+    assert "/assets/app.css?v=20260903.8" in page.text
+    assert "/assets/app.js?v=20260903.8" in page.text
     assert "cooperation-icon" in page.text
     assert "competition-icon" in page.text
+    assert "edit-calendar-item" in page.text
+    assert "remove-calendar-item" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
     assert 'body[data-theme="competitive"]' in stylesheet.text

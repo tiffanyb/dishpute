@@ -11,6 +11,7 @@ const state = {
   activeView: "calendar",
   taskFilter: "all",
   selectedTaskId: null,
+  selectedCalendarItem: null,
   theme: localStorage.getItem("dishpute.theme") || "cooperative",
 };
 
@@ -50,6 +51,16 @@ function colorForMember(id) {
 function participantNames(ids) {
   if (!ids?.length) return "Unplanned";
   return ids.map((id) => memberById(id)?.display_name || "Member").join(" + ");
+}
+
+function dateInputValue(value) {
+  const date = new Date(value);
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+}
+
+function timeInputValue(value) {
+  const date = new Date(value);
+  return [String(date.getHours()).padStart(2, "0"), String(date.getMinutes()).padStart(2, "0")].join(":");
 }
 
 function applyTheme(theme) {
@@ -283,6 +294,7 @@ function taskItemMarkup(item) {
 function openItem(type, id) {
   const item = type === "calendar" ? state.calendarItems.find((entry) => entry.id === id) : state.workItems.find((entry) => entry.id === id);
   if (!item) return;
+  state.selectedCalendarItem = type === "calendar" ? item : null;
   $("#item-dialog-kicker").textContent = type === "calendar" ? "Calendar item" : item.item_type.replace("_", " ");
   $("#item-dialog-title").textContent = item.title || "Household time";
   const rows = [
@@ -296,7 +308,101 @@ function openItem(type, id) {
   if (item.duration_minutes) rows.push(["Duration", `${item.duration_minutes} minutes`]);
   if (item.counts_toward_fairness !== null && item.counts_toward_fairness !== undefined) rows.push(["Fairness", item.counts_toward_fairness ? "Included" : "Not included"]);
   $("#item-details").innerHTML = rows.map(([label, value]) => `<dt>${label}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+  $("#item-detail-error").classList.add("hidden");
+  $(".item-dialog-actions").classList.toggle("hidden", type !== "calendar");
   $("#item-dialog").showModal();
+}
+
+async function editSelectedCalendarItem() {
+  const item = state.selectedCalendarItem;
+  if (!item) return;
+  const title = window.prompt("Task title", item.title || "Household time");
+  if (title === null) return;
+  const date = window.prompt("Date", dateInputValue(item.starts_at));
+  if (date === null) return;
+  const start = window.prompt("Start time", timeInputValue(item.starts_at));
+  if (start === null) return;
+  const end = window.prompt("End time", timeInputValue(item.ends_at));
+  if (end === null) return;
+  const startsAt = new Date(`${date}T${start}`);
+  const endsAt = new Date(`${date}T${end}`);
+  const errorElement = $("#item-detail-error");
+  if (!title.trim()) {
+    errorElement.textContent = "Enter a title.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+    errorElement.textContent = "Enter a valid time range.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  errorElement.classList.add("hidden");
+  try {
+    if (item.item_type === "planned") {
+      if (item.task_ids?.[0]) {
+        await api(`/households/${state.householdId}/tasks/${item.task_ids[0]}`, {
+          method: "PATCH",
+          idempotentWrite: true,
+          body: JSON.stringify({ title: title.trim() }),
+        });
+      }
+      await api(`/households/${state.householdId}/time-blocks/${item.id}`, {
+        method: "PATCH",
+        idempotentWrite: true,
+        body: JSON.stringify({
+          title: title.trim(),
+          starts_at: startsAt.toISOString(),
+          ends_at: endsAt.toISOString(),
+        }),
+      });
+    } else if (item.completion_record_id) {
+      await api(`/households/${state.householdId}/completed-work/${item.completion_record_id}`, {
+        method: "PATCH",
+        idempotentWrite: true,
+        body: JSON.stringify({
+          description: title.trim(),
+          started_at: startsAt.toISOString(),
+          ended_at: endsAt.toISOString(),
+        }),
+      });
+    }
+    $("#item-dialog").close();
+    state.weekStart = startOfWeek(startsAt);
+    await loadAll();
+    showToast("Calendar item updated");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  }
+}
+
+async function removeSelectedCalendarItem() {
+  const item = state.selectedCalendarItem;
+  if (!item) return;
+  const label = item.item_type === "planned" ? "Remove this scheduled Task from the calendar?" : "Permanently delete this completed work record?";
+  if (!window.confirm(label)) return;
+  const errorElement = $("#item-detail-error");
+  errorElement.classList.add("hidden");
+  try {
+    if (item.item_type === "planned") {
+      await api(`/households/${state.householdId}/time-blocks/${item.id}`, {
+        method: "PATCH",
+        idempotentWrite: true,
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+    } else if (item.completion_record_id) {
+      await api(`/households/${state.householdId}/completed-work/${item.completion_record_id}`, {
+        method: "DELETE",
+      });
+    }
+    $("#item-dialog").close();
+    await loadAll();
+    showToast("Calendar item removed");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  }
 }
 
 async function openTaskDetail(taskId) {
@@ -633,6 +739,8 @@ function bindEvents() {
   $("#previous-week").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, -7); loadAll(); });
   $("#next-week").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, 7); loadAll(); });
   $("#close-item-dialog").addEventListener("click", () => $("#item-dialog").close());
+  $("#edit-calendar-item").addEventListener("click", editSelectedCalendarItem);
+  $("#remove-calendar-item").addEventListener("click", removeSelectedCalendarItem);
   $$("#task-filters button").forEach((button) => button.addEventListener("click", () => {
     state.taskFilter = button.dataset.filter;
     $$("#task-filters button").forEach((candidate) => candidate.classList.toggle("active", candidate === button));

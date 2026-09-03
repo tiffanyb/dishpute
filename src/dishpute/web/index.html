@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;900&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260903.7" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260903.8" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260903.7" defer></script>
+    <script src="/assets/app.js?v=20260903.8" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -223,6 +223,11 @@
         </button>
       </div>
       <dl class="item-details" id="item-details"></dl>
+      <p class="form-error hidden" id="item-detail-error" role="alert"></p>
+      <div class="dialog-actions item-dialog-actions">
+        <button class="text-button danger-button" id="remove-calendar-item" type="button"><i data-lucide="trash-2"></i>Remove</button>
+        <button class="text-button" id="edit-calendar-item" type="button"><i data-lucide="pencil"></i>Edit</button>
+      </div>
     </dialog>
 
     <dialog id="task-create-dialog">

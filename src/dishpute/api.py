@@ -39,6 +39,7 @@ from dishpute.schemas import (
     CalendarItemResponse,
     CompletedWorkCreate,
     CompletedWorkResponse,
+    CompletedWorkUpdate,
     ContributionResponse,
     HouseholdCreate,
     HouseholdMemberResponse,
@@ -67,6 +68,7 @@ from dishpute.services import (
     ListedTimeBlock,
     TaskDetails,
     create_task,
+    delete_completed_work,
     delete_task,
     get_task_details,
     list_calendar_items,
@@ -76,6 +78,7 @@ from dishpute.services import (
     list_work_items,
     record_completed_work,
     schedule_task,
+    update_completed_work,
     update_planned_time_block,
     update_task,
     update_task_lifecycle,
@@ -174,6 +177,18 @@ def _calendar_item_response(result: CalendarItem) -> CalendarItemResponse:
         counts_toward_fairness=(
             completion.counts_toward_fairness if completion is not None else None
         ),
+    )
+
+
+def _completed_work_response(recorded) -> CompletedWorkResponse:
+    return CompletedWorkResponse(
+        completion_record_id=recorded.completion.id,
+        time_block_id=(recorded.time_block.id if recorded.time_block is not None else None),
+        task_id=recorded.completion.task_id,
+        participant_user_ids=recorded.participant_user_ids,
+        effective_duration_minutes=recorded.effective_duration_minutes,
+        work_scope=recorded.completion.work_scope,
+        counts_toward_fairness=recorded.completion.counts_toward_fairness,
     )
 
 
@@ -776,15 +791,7 @@ def record_completed_work_route(
                 actor_user_id=actor_user_id,
                 **payload.model_dump(),
             )
-            return CompletedWorkResponse(
-                completion_record_id=recorded.completion.id,
-                time_block_id=(recorded.time_block.id if recorded.time_block is not None else None),
-                task_id=recorded.completion.task_id,
-                participant_user_ids=recorded.participant_user_ids,
-                effective_duration_minutes=recorded.effective_duration_minutes,
-                work_scope=recorded.completion.work_scope,
-                counts_toward_fairness=recorded.completion.counts_toward_fairness,
-            )
+            return _completed_work_response(recorded)
 
         result, replayed = execute_idempotent(
             session,
@@ -798,6 +805,63 @@ def record_completed_work_route(
         )
     response.headers["Idempotency-Replayed"] = str(replayed).lower()
     return result
+
+
+@app.patch(
+    "/households/{household_id}/completed-work/{completion_record_id}",
+    response_model=CompletedWorkResponse,
+)
+def update_completed_work_route(
+    household_id: UUID,
+    completion_record_id: UUID,
+    payload: CompletedWorkUpdate,
+    actor_user_id: ActorUserId,
+    idempotency_key: IdempotencyKey,
+    session: DatabaseSession,
+    response: Response,
+) -> CompletedWorkResponse:
+    with _transaction(session):
+        result, replayed = execute_idempotent(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            operation=f"update_completed_work:{completion_record_id}",
+            payload=payload,
+            response_model=CompletedWorkResponse,
+            response_status=200,
+            action=lambda: _completed_work_response(
+                update_completed_work(
+                    session,
+                    household_id=household_id,
+                    actor_user_id=actor_user_id,
+                    completion_record_id=completion_record_id,
+                    changes=payload.model_dump(exclude_unset=True),
+                )
+            ),
+        )
+    response.headers["Idempotency-Replayed"] = str(replayed).lower()
+    return result
+
+
+@app.delete(
+    "/households/{household_id}/completed-work/{completion_record_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_completed_work_route(
+    household_id: UUID,
+    completion_record_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> Response:
+    with _transaction(session):
+        delete_completed_work(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            completion_record_id=completion_record_id,
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get(
