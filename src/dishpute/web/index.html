@@ -60,7 +60,7 @@
             <h2 id="week-title">This week</h2>
           </div>
           <div class="date-controls">
-            <button class="primary-button" id="record-work-button" type="button"><i data-lucide="plus-circle"></i>Create a work</button>
+            <button class="primary-button" id="record-work-button" type="button"><i data-lucide="plus-circle"></i>Create Task</button>
             <button class="text-button" id="today-button" type="button">Today</button>
             <div class="button-group">
               <button class="icon-button" id="previous-week" type="button" title="Previous week">
@@ -282,15 +282,22 @@
         <div class="dialog-header">
           <div class="dialog-title-stack">
             <p class="section-kicker">Work</p>
-            <input aria-label="Work title" class="dialog-title-input" id="completed-work-title" maxlength="300" placeholder="Create a work" />
+            <input aria-label="Work title" class="dialog-title-input" id="completed-work-title" maxlength="300" placeholder="Create Task" />
           </div>
           <button class="icon-button" id="close-completed-work" type="button" title="Close"><i data-lucide="x"></i></button>
         </div>
-        <div class="form-grid">
-          <label>Date<input id="completed-work-date" type="date" required /></label>
+        <label>Date<input id="completed-work-date" type="date" required /></label>
+        <div class="segmented-control time-mode" id="completed-work-time-mode" aria-label="Choose time entry mode">
+          <button class="active" data-time-mode="duration" type="button">Duration</button>
+          <button data-time-mode="range" type="button">Time range</button>
+        </div>
+        <div class="form-grid" id="completed-work-duration-fields">
           <label>Duration <span class="optional-label">minutes</span><input id="completed-work-duration" type="number" min="1" /></label>
-          <label>Start time<input id="completed-work-start" type="time" /></label>
           <label>End time<input id="completed-work-end" type="time" /></label>
+        </div>
+        <div class="form-grid hidden" id="completed-work-range-fields">
+          <label>Start time<input id="completed-work-start" type="time" /></label>
+          <label>End time<input id="completed-work-range-end" type="time" /></label>
         </div>
         <fieldset><legend>Completed by</legend><div class="participant-options" id="completed-work-participants"></div></fieldset>
         <details class="dialog-options">
@@ -309,7 +316,7 @@
         <p class="form-error hidden" id="completed-work-error" role="alert"></p>
         <div class="dialog-actions">
           <button class="text-button" id="cancel-completed-work" type="button">Cancel</button>
-          <button class="primary-button" id="save-completed-work" type="submit">Create a work</button>
+          <button class="primary-button" id="save-completed-work" type="submit">Create Task</button>
         </div>
       </form>
     </dialog>

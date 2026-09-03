@@ -389,6 +389,8 @@ function openCompletedWorkDialog() {
   $("#completed-work-form").reset();
   $("#completed-work-date").value = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
   $("#completed-work-end").value = [String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0")].join(":");
+  $("#completed-work-range-end").value = $("#completed-work-end").value;
+  setCompletedWorkTimeMode("duration");
   $("#completed-work-participants").innerHTML = state.members.map((member) => `
     <label class="participant-option"><input type="checkbox" value="${member.user_id}" ${member.user_id === state.userId ? "checked" : ""} />${escapeHtml(member.display_name)}</label>`).join("");
   const tasks = state.workItems.filter((item) => item.item_type === "task" && item.status === "active");
@@ -398,35 +400,48 @@ function openCompletedWorkDialog() {
   $("#completed-work-title").focus();
 }
 
+function setCompletedWorkTimeMode(mode) {
+  $$("#completed-work-time-mode button").forEach((button) => button.classList.toggle("active", button.dataset.timeMode === mode));
+  $("#completed-work-duration-fields").classList.toggle("hidden", mode !== "duration");
+  $("#completed-work-range-fields").classList.toggle("hidden", mode !== "range");
+}
+
 async function createWork(event) {
   event.preventDefault();
   const date = $("#completed-work-date").value;
   const start = $("#completed-work-start").value;
-  const end = $("#completed-work-end").value;
+  const durationEnd = $("#completed-work-end").value;
+  const rangeEnd = $("#completed-work-range-end").value;
   const duration = $("#completed-work-duration").value;
+  const timeMode = $("#completed-work-time-mode button.active")?.dataset.timeMode || "duration";
   const title = $("#completed-work-title").value.trim();
   const note = $("#completed-work-note").value.trim();
   const description = [title, note].filter(Boolean).join("\n\n") || null;
   const errorElement = $("#completed-work-error");
-  if (!duration && (!start || !end)) {
-    errorElement.textContent = "Enter a duration, or a start and end time.";
+  if (timeMode === "duration" && !duration) {
+    errorElement.textContent = "Enter duration minutes.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
+  if (timeMode === "range" && (!start || !rangeEnd)) {
+    errorElement.textContent = "Enter both start time and end time.";
     errorElement.classList.remove("hidden");
     return;
   }
   let startedAt = null;
   let endedAt = null;
   let durationOverride = null;
-  if (duration) {
+  if (timeMode === "duration") {
     const minutes = Number(duration);
-    const endTime = end || [String(new Date().getHours()).padStart(2, "0"), String(new Date().getMinutes()).padStart(2, "0")].join(":");
+    const endTime = durationEnd || [String(new Date().getHours()).padStart(2, "0"), String(new Date().getMinutes()).padStart(2, "0")].join(":");
     endedAt = new Date(`${date}T${endTime}`);
     startedAt = new Date(endedAt.getTime() - minutes * 60 * 1000);
     durationOverride = minutes;
   } else {
     startedAt = new Date(`${date}T${start}`);
-    endedAt = new Date(`${date}T${end}`);
+    endedAt = new Date(`${date}T${rangeEnd}`);
   }
-  const isScheduled = !duration && startedAt > new Date();
+  const isScheduled = timeMode === "range" && startedAt > new Date();
   if (isScheduled && !title) {
     errorElement.textContent = "Enter a title for scheduled work.";
     errorElement.classList.remove("hidden");
@@ -477,7 +492,7 @@ async function createWork(event) {
     $("#completed-work-dialog").close();
     state.weekStart = startOfWeek(new Date(`${date}T12:00`));
     await loadAll();
-    showToast(isScheduled ? "Work scheduled" : "Work created");
+    showToast(isScheduled ? "Task scheduled" : "Work recorded");
   } catch (error) {
     errorElement.textContent = error.message;
     errorElement.classList.remove("hidden");
@@ -678,6 +693,9 @@ function bindEvents() {
   $("#close-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
   $("#cancel-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
   $("#completed-work-form").addEventListener("submit", createWork);
+  $$("#completed-work-time-mode button").forEach((button) => {
+    button.addEventListener("click", () => setCompletedWorkTimeMode(button.dataset.timeMode));
+  });
   document.addEventListener("keydown", (event) => {
     if (event.shiftKey && event.key.toLowerCase() === "c" && !event.metaKey && !event.ctrlKey && !event.altKey) {
       const target = event.target;
