@@ -427,8 +427,23 @@ def build_oauth_mcp() -> FastMCP:
         )
 
     @server.custom_route("/.well-known/oauth-authorization-server/mcp", methods=["GET", "OPTIONS"])
+    @server.custom_route("/.well-known/oauth-authorization-server/mcp/", methods=["GET", "OPTIONS"])
     @server.custom_route("/mcp/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])
+    @server.custom_route("/mcp/.well-known/oauth-authorization-server/", methods=["GET", "OPTIONS"])
+    @server.custom_route("/.well-known/openid-configuration", methods=["GET", "OPTIONS"])
+    @server.custom_route("/.well-known/openid-configuration/", methods=["GET", "OPTIONS"])
+    @server.custom_route("/mcp/.well-known/openid-configuration", methods=["GET", "OPTIONS"])
+    @server.custom_route("/mcp/.well-known/openid-configuration/", methods=["GET", "OPTIONS"])
     async def oauth_authorization_server_metadata(_request: Request):
+        if _request.method == "OPTIONS":
+            return metadata_options_response()
+        return JSONResponse(
+            authorization_server_metadata(),
+            headers=metadata_headers(),
+        )
+
+    @server.custom_route("/.well-known/oauth-authorization-server/", methods=["GET", "OPTIONS"])
+    async def oauth_authorization_server_metadata_trailing_slash(_request: Request):
         if _request.method == "OPTIONS":
             return metadata_options_response()
         return JSONResponse(
