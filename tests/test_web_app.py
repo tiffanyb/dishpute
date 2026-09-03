@@ -31,8 +31,8 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Use at least 10 characters" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
-    assert "/assets/app.css?v=20260903.4" in page.text
-    assert "/assets/app.js?v=20260903.4" in page.text
+    assert "/assets/app.css?v=20260903.5" in page.text
+    assert "/assets/app.js?v=20260903.5" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
     assert 'body[data-theme="competitive"]' in stylesheet.text
@@ -52,4 +52,7 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "setCompletedWorkTimeMode" in script.text
     assert "dishpute.theme" in script.text
     assert "applyTheme" in script.text
+    assert "createIdempotencyKey" in script.text
+    assert "randomUUID" in script.text
+    assert "getRandomValues" in script.text
     assert "event.shiftKey" in script.text
