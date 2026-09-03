@@ -40,6 +40,24 @@ tailscale serve --bg 8000
 Tailscale Serve provisions and renews HTTPS for the machine's private `*.ts.net`
 hostname. It does not issue a certificate for a custom hostname.
 
+## Public web application through Tailscale Funnel
+
+To make the web application reachable without Tailscale, switch HTTPS port 443 from
+Serve to Funnel:
+
+```bash
+tailscale funnel --bg --https=443 8000
+```
+
+This publishes `https://YOUR-NODE.YOUR-TAILNET.ts.net/` while keeping the application
+container bound to loopback and the server's Tailscale address. Switch the website
+back to tailnet-only access without changing the application deployment:
+
+```bash
+tailscale funnel --https=443 off
+tailscale serve --bg --https=443 8000
+```
+
 ## Public OAuth-protected MCP gateway
 
 The production Compose file includes a separate MCP service. The Tailscale override
@@ -54,8 +72,9 @@ docker compose \
   up -d --build
 ```
 
-Publish only the MCP gateway through Tailscale Funnel. Port 443 remains a private
-Tailscale Serve route for the web application:
+Publish the MCP gateway through Tailscale Funnel on its separate port. The command
+shown for port 443 keeps the web application private; use the public-web instructions
+above when the website should also be public:
 
 ```bash
 tailscale serve --bg 8000
