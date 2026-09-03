@@ -122,3 +122,48 @@ async def test_calendar_tool_uses_an_exclusive_date_range() -> None:
         "range_start": "2026-09-01T00:00:00-07:00",
         "range_end": "2026-09-08T00:00:00-07:00",
     }
+
+
+@pytest.mark.anyio
+async def test_record_completed_task_resolves_participant_names() -> None:
+    second_user_id = uuid4()
+    captured: dict[str, object] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == f"/households/{HOUSEHOLD_ID}/members":
+            return httpx.Response(
+                200,
+                json=[
+                    {"user_id": str(USER_ID), "display_name": "Tiffany"},
+                    {"user_id": str(second_user_id), "display_name": "Zilin"},
+                ],
+            )
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            201,
+            json={
+                "completion_record_id": str(uuid4()),
+                "time_block_id": str(uuid4()),
+                "task_id": None,
+                "participant_user_ids": [str(USER_ID), str(second_user_id)],
+                "effective_duration_minutes": 150,
+                "work_scope": "household",
+                "counts_toward_fairness": True,
+            },
+        )
+
+    server = build_mcp(mock_client(httpx.MockTransport(handle)))
+    _content, result = await server.call_tool(
+        "record_completed_task",
+        {
+            "title": "Home office design",
+            "work_date": date(2026, 9, 3),
+            "start_time": time(10, 0),
+            "end_time": time(12, 30),
+            "completed_by_names": ["Tiffany", "Zilin"],
+        },
+    )
+
+    assert isinstance(result, dict)
+    assert result["effective_duration_minutes"] == 150
+    assert captured["body"]["participant_user_ids"] == [str(USER_ID), str(second_user_id)]

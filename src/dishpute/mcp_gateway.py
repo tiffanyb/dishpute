@@ -170,11 +170,35 @@ def build_mcp(
         work_scope: Literal["household", "personal"],
         counts_toward_fairness: bool | None,
         completed_by_user_ids: list[UUID] | None,
+        completed_by_names: list[str] | None,
     ) -> dict[str, Any]:
         started_at = client.local_datetime(work_date, start_time)
         ended_at = client.local_datetime(work_date, end_time)
         if ended_at <= started_at:
             raise ValueError("end_time must be after start_time on the same date")
+        participant_user_ids = completed_by_user_ids or []
+        if completed_by_names:
+            members = await client.request(
+                "GET", f"/households/{client.active_household_id}/members"
+            )
+            members_by_name = {
+                str(member["display_name"]).casefold(): UUID(member["user_id"])
+                for member in members
+            }
+            missing = [
+                name
+                for name in completed_by_names
+                if name.casefold() not in members_by_name
+            ]
+            if missing:
+                raise ValueError(
+                    "No active household member matched: " + ", ".join(missing)
+                )
+            participant_user_ids = [
+                *participant_user_ids,
+                *(members_by_name[name.casefold()] for name in completed_by_names),
+            ]
+        participant_user_ids = list(dict.fromkeys(participant_user_ids))
         return await client.request(
             "POST",
             f"/households/{client.active_household_id}/completed-work",
@@ -185,7 +209,7 @@ def build_mcp(
                 "work_scope": work_scope,
                 "counts_toward_fairness": counts_toward_fairness,
                 "participant_user_ids": [
-                    str(value) for value in (completed_by_user_ids or [client.active_user_id])
+                    str(value) for value in (participant_user_ids or [client.active_user_id])
                 ],
                 "started_at": started_at.isoformat(),
                 "ended_at": ended_at.isoformat(),
@@ -202,8 +226,9 @@ def build_mcp(
         work_scope: Literal["household", "personal"] = "household",
         counts_toward_fairness: bool | None = None,
         completed_by_user_ids: list[UUID] | None = None,
+        completed_by_names: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Record work that already happened. Use for past work even when the user says to create, add, log, or record a task with a completed time range."""
+        """Record work that already happened. Use completed_by_names for participant names such as Tiffany or Zilin; do not ask the user for UUIDs."""
         return await record_completed_work(
             title=title,
             work_date=work_date,
@@ -213,6 +238,7 @@ def build_mcp(
             work_scope=work_scope,
             counts_toward_fairness=counts_toward_fairness,
             completed_by_user_ids=completed_by_user_ids,
+            completed_by_names=completed_by_names,
         )
 
     @server.tool(annotations=write_tool, structured_output=True)
@@ -225,8 +251,9 @@ def build_mcp(
         work_scope: Literal["household", "personal"] = "household",
         counts_toward_fairness: bool | None = None,
         completed_by_user_ids: list[UUID] | None = None,
+        completed_by_names: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Record a task or work session that already happened. Use this when the user says people worked on something during a past time range."""
+        """Record a task or work session that already happened. Use completed_by_names for participant names such as Tiffany or Zilin; do not ask the user for UUIDs."""
         return await record_completed_work(
             title=title,
             work_date=work_date,
@@ -236,6 +263,7 @@ def build_mcp(
             work_scope=work_scope,
             counts_toward_fairness=counts_toward_fairness,
             completed_by_user_ids=completed_by_user_ids,
+            completed_by_names=completed_by_names,
         )
 
     @server.tool(annotations=write_tool, structured_output=True)
