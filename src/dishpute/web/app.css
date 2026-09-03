@@ -68,8 +68,9 @@ body[data-theme="competitive"] {
   background: #28644c; color: white; border-radius: 6px;
 }
 .brand-mark svg { width: 30px; height: 30px; display: block; }
-.brand-mark .dish-letter { fill: currentColor; }
-.brand-mark .dish-bowl, .brand-mark .dish-rim { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.brand-letter-d { fill: currentColor; }
+.brand-eye-blue { fill: #67c4ff; }
+.brand-eye-pink { fill: #ff93c8; }
 .brand-lockup h1 { margin: 0; font-family: "DM Serif Display", serif; font-size: 25px; font-weight: 400; }
 .brand-lockup p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
 .header-actions { gap: 10px; }
