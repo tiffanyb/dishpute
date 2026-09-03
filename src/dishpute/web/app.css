@@ -65,14 +65,17 @@ body[data-theme="competitive"] {
 .brand-lockup { gap: 12px; }
 .brand-mark {
   width: 38px; height: 38px; display: grid; place-items: center;
-  background: var(--ink); color: white; border-radius: 6px;
-  font-family: "DM Serif Display", serif; font-size: 24px;
+  background: #28644c; color: white; border-radius: 6px;
 }
+.brand-mark svg { width: 30px; height: 30px; display: block; }
+.brand-mark .dish-letter { fill: currentColor; }
+.brand-mark .dish-bowl, .brand-mark .dish-rim { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
 .brand-lockup h1 { margin: 0; font-family: "DM Serif Display", serif; font-size: 25px; font-weight: 400; }
 .brand-lockup p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
 .header-actions { gap: 10px; }
 .theme-switch { margin-left: 18px; }
 .theme-switch button { min-width: 142px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.theme-switch button.active { background: var(--green); color: white; }
 .theme-icon { width: 22px; height: 18px; flex: 0 0 auto; }
 .cooperation-icon { overflow: visible; }
 .cooperation-icon path { stroke: #171717; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
@@ -262,7 +265,6 @@ body[data-theme="competitive"] .app-header {
   backdrop-filter: none;
   box-shadow: 0 8px 0 var(--ink);
 }
-body[data-theme="competitive"] .brand-mark,
 body[data-theme="competitive"] .primary-button,
 body[data-theme="competitive"] .segmented-control button.active,
 body[data-theme="competitive"] .time-mode label:has(input:checked),
@@ -270,7 +272,6 @@ body[data-theme="competitive"] .calendar-day.today .day-header span {
   background: var(--green);
   color: white;
 }
-body[data-theme="competitive"] .brand-mark,
 body[data-theme="competitive"] .primary-button,
 body[data-theme="competitive"] .text-button,
 body[data-theme="competitive"] .button-group,
@@ -287,7 +288,6 @@ body[data-theme="competitive"] dialog select,
 body[data-theme="competitive"] .participant-option {
   border: 3px solid var(--ink);
 }
-body[data-theme="competitive"] .brand-mark,
 body[data-theme="competitive"] .primary-button,
 body[data-theme="competitive"] .calendar-grid,
 body[data-theme="competitive"] .task-list,
