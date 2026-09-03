@@ -5,6 +5,7 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     page = api_client.get("/")
     stylesheet = api_client.get("/assets/app.css")
     script = api_client.get("/assets/app.js")
+    logo = api_client.get("/assets/dishpute-logo.svg")
 
     assert page.status_code == 200
     assert "Calendar" in page.text
@@ -31,11 +32,9 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Use at least 10 characters" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
-    assert "/assets/app.css?v=20260903.11" in page.text
-    assert "/assets/app.js?v=20260903.11" in page.text
-    assert "brand-letter-d" in page.text
-    assert "brand-eye-blue" in page.text
-    assert "brand-eye-pink" in page.text
+    assert "/assets/app.css?v=20260903.12" in page.text
+    assert "/assets/app.js?v=20260903.12" in page.text
+    assert "/assets/dishpute-logo.svg" in page.text
     assert "cooperation-icon" in page.text
     assert "competition-icon" in page.text
     assert "edit-calendar-item" in page.text
@@ -58,6 +57,8 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "createWork" in script.text
     assert "setCompletedWorkTimeMode" in script.text
     assert "dishpute.theme" in script.text
+    assert logo.status_code == 200
+    assert 'fill="#000000"' in logo.text
     assert "applyTheme" in script.text
     assert "createIdempotencyKey" in script.text
     assert "randomUUID" in script.text
