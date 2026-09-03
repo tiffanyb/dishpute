@@ -31,8 +31,10 @@ async def test_mcp_exposes_client_neutral_household_tools() -> None:
 
     assert set(tools) == {
         "record_work",
+        "record_completed_task",
         "create_task",
         "list_work_items",
+        "list_household_members",
         "get_calendar",
         "update_task",
         "schedule_task",

@@ -160,18 +160,17 @@ def build_mcp(
         openWorldHint=False,
     )
 
-    @server.tool(annotations=write_tool, structured_output=True)
-    async def record_work(
+    async def record_completed_work(
+        *,
         title: str,
         work_date: date,
         start_time: time,
         end_time: time,
-        category: str = "other",
-        work_scope: Literal["household", "personal"] = "household",
-        counts_toward_fairness: bool | None = None,
-        completed_by_user_ids: list[UUID] | None = None,
+        category: str,
+        work_scope: Literal["household", "personal"],
+        counts_toward_fairness: bool | None,
+        completed_by_user_ids: list[UUID] | None,
     ) -> dict[str, Any]:
-        """Record work that already happened. Use for past work even when the user says to create, add, log, or record a task with a completed time range."""
         started_at = client.local_datetime(work_date, start_time)
         ended_at = client.local_datetime(work_date, end_time)
         if ended_at <= started_at:
@@ -191,6 +190,52 @@ def build_mcp(
                 "started_at": started_at.isoformat(),
                 "ended_at": ended_at.isoformat(),
             },
+        )
+
+    @server.tool(annotations=write_tool, structured_output=True)
+    async def record_work(
+        title: str,
+        work_date: date,
+        start_time: time,
+        end_time: time,
+        category: str = "other",
+        work_scope: Literal["household", "personal"] = "household",
+        counts_toward_fairness: bool | None = None,
+        completed_by_user_ids: list[UUID] | None = None,
+    ) -> dict[str, Any]:
+        """Record work that already happened. Use for past work even when the user says to create, add, log, or record a task with a completed time range."""
+        return await record_completed_work(
+            title=title,
+            work_date=work_date,
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+            work_scope=work_scope,
+            counts_toward_fairness=counts_toward_fairness,
+            completed_by_user_ids=completed_by_user_ids,
+        )
+
+    @server.tool(annotations=write_tool, structured_output=True)
+    async def record_completed_task(
+        title: str,
+        work_date: date,
+        start_time: time,
+        end_time: time,
+        category: str = "other",
+        work_scope: Literal["household", "personal"] = "household",
+        counts_toward_fairness: bool | None = None,
+        completed_by_user_ids: list[UUID] | None = None,
+    ) -> dict[str, Any]:
+        """Record a task or work session that already happened. Use this when the user says people worked on something during a past time range."""
+        return await record_completed_work(
+            title=title,
+            work_date=work_date,
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+            work_scope=work_scope,
+            counts_toward_fairness=counts_toward_fairness,
+            completed_by_user_ids=completed_by_user_ids,
         )
 
     @server.tool(annotations=write_tool, structured_output=True)
@@ -221,6 +266,11 @@ def build_mcp(
     async def list_work_items() -> list[dict[str, Any]]:
         """List shared Tasks and completed work visible in the Dishpute Tasks tab."""
         return await client.request("GET", f"/households/{client.active_household_id}/work-items")
+
+    @server.tool(annotations=read_only, structured_output=True)
+    async def list_household_members() -> list[dict[str, Any]]:
+        """List active household members with display names and user IDs. Use this to resolve participant names such as Tiffany or Zilin before recording joint work."""
+        return await client.request("GET", f"/households/{client.active_household_id}/members")
 
     @server.tool(annotations=read_only, structured_output=True)
     async def get_calendar(range_start: date, range_end: date) -> list[dict[str, Any]]:
