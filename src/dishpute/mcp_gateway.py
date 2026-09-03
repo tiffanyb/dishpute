@@ -129,7 +129,9 @@ def build_mcp(
             "record_work. Future work should use create_task, followed by schedule_task "
             "when a time is known. 'I' means the authenticated Dishpute member. Personal "
             "work remains visible to the household but normally does not count toward "
-            "household fairness."
+            "household fairness. If the user asks to create, add, log, or record work "
+            "with a time range that has already happened, record completed work instead "
+            "of creating a future Task."
         ),
         stateless_http=True,
         json_response=True,
@@ -169,7 +171,7 @@ def build_mcp(
         counts_toward_fairness: bool | None = None,
         completed_by_user_ids: list[UUID] | None = None,
     ) -> dict[str, Any]:
-        """Record work that already happened. Use for phrases such as 'I just wrote a proposal 2pm-3pm'."""
+        """Record work that already happened. Use for past work even when the user says to create, add, log, or record a task with a completed time range."""
         started_at = client.local_datetime(work_date, start_time)
         ended_at = client.local_datetime(work_date, end_time)
         if ended_at <= started_at:
