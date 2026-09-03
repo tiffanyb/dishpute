@@ -80,7 +80,8 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 32px 48px; }
 .button-group { border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
 .button-group .icon-button { border-radius: 0; }
 .button-group .icon-button + .icon-button { border-left: 1px solid var(--line); }
-.text-button { min-height: 36px; padding: 0 12px; border-radius: 6px; font-weight: 600; }
+.text-button { min-height: 36px; padding: 0 12px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
+.text-button svg { width: 16px; height: 16px; }
 
 .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); min-height: 520px; }
 .calendar-day { min-width: 0; border-right: 1px solid var(--line); }
@@ -189,7 +190,8 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .detail-empty { color: var(--muted); font-size: 12px; }
 .detail-row { padding: 9px 0; border-bottom: 1px solid #e8eae6; font-size: 12px; }
 .detail-row:last-child { border-bottom: 0; }
-.danger-button { color: var(--coral); margin-right: auto; }
+.danger-button { color: var(--coral); }
+#delete-task-button { margin-right: auto; }
 .task-lifecycle-actions { border-top: 1px solid var(--line); padding-top: 16px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 360px; padding: 12px 16px; background: var(--ink); color: white; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 12px; z-index: 30; }
 

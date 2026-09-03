@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, exists, select, text
+from sqlalchemy import delete, exists, func, select, text, update
 from sqlalchemy.orm import Session
 
 from dishpute.models import (
@@ -471,6 +471,62 @@ def update_task(
         actor_user_id=actor_user_id,
         task_id=task.id,
     )
+
+
+def delete_task(
+    session: Session,
+    *,
+    household_id: UUID,
+    actor_user_id: UUID,
+    task_id: UUID,
+) -> None:
+    _require_active_membership(session, household_id, actor_user_id)
+    task = _find_task(session, household_id, task_id)
+    if task.created_by_user_id != actor_user_id:
+        raise AccessDeniedError("Only the member who created this Task can delete it")
+    if session.scalar(
+        select(exists().where(Task.household_id == household_id, Task.parent_task_id == task.id))
+    ):
+        raise ConflictError("Delete this Task's subtasks first")
+
+    linked_blocks = list(
+        session.scalars(
+            select(TimeBlock)
+            .join(TimeBlockTask, TimeBlockTask.time_block_id == TimeBlock.id)
+            .where(
+                TimeBlock.household_id == household_id,
+                TimeBlockTask.task_id == task.id,
+            )
+        )
+    )
+    for block in linked_blocks:
+        link_count = session.scalar(
+            select(func.count()).select_from(TimeBlockTask).where(
+                TimeBlockTask.time_block_id == block.id
+            )
+        )
+        if block.block_kind == "planned" and link_count == 1:
+            session.delete(block)
+
+    session.execute(
+        update(CompletionRecord)
+        .where(
+            CompletionRecord.household_id == household_id,
+            CompletionRecord.task_id == task.id,
+        )
+        .values(task_id=None, task_instance_id=None)
+    )
+    _audit(
+        session,
+        household_id,
+        actor_user_id,
+        "delete",
+        "task",
+        task.id,
+        before_values={"title": task.title},
+    )
+    session.delete(task)
+    session.flush()
 
 
 def schedule_task(

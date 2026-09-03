@@ -15,6 +15,7 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Planned with" in page.text
     assert "Reserved time" in page.text
     assert "Cancel task" in page.text
+    assert "Delete" in page.text
     assert "Reserve time" in page.text
     assert "Completed by" in page.text
     assert "Manual duration" in page.text
@@ -36,5 +37,6 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "renderHousehold" in script.text
     assert "createTask" in script.text
     assert "updateSelectedTaskLifecycle" in script.text
+    assert "deleteSelectedTask" in script.text
     assert "scheduleSelectedTask" in script.text
     assert "recordCompletedWork" in script.text

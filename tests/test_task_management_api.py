@@ -10,6 +10,7 @@ from dishpute.models import (
     Household,
     HouseholdMembership,
     IntegrationRequest,
+    CompletionRecord,
     Task,
     TimeBlock,
 )
@@ -216,6 +217,81 @@ def test_task_completion_and_reopening_are_explicit_and_audited(
     assert reopened.json()["lifecycle_status"] == "active"
     assert session.get(Task, UUID(child["id"])).lifecycle_status == "active"
     assert session.scalar(select(func.count()).select_from(AuditEvent)) == 4
+
+
+def test_creator_can_delete_task_and_its_task_only_planned_time(
+    api_client: TestClient, session: Session
+) -> None:
+    household, creator, other_member = create_family(session)
+    task = create_task(
+        api_client,
+        household.id,
+        creator.id,
+        "Clean kitchen",
+        scheduled_start="2026-09-03T10:00:00-07:00",
+        scheduled_end="2026-09-03T11:00:00-07:00",
+    )
+
+    forbidden = api_client.delete(
+        f"/households/{household.id}/tasks/{task['id']}",
+        headers=headers(other_member.id),
+    )
+    assert forbidden.status_code == 403
+
+    deleted = api_client.delete(
+        f"/households/{household.id}/tasks/{task['id']}",
+        headers=headers(creator.id),
+    )
+    assert deleted.status_code == 204
+    assert session.get(Task, UUID(task["id"])) is None
+    assert session.scalar(select(func.count()).select_from(TimeBlock)) == 0
+    audit = session.scalar(
+        select(AuditEvent).where(AuditEvent.action == "delete", AuditEvent.entity_id == UUID(task["id"]))
+    )
+    assert audit is not None
+    assert audit.before_values == {"title": "Clean kitchen"}
+
+
+def test_deleting_task_preserves_completed_work_and_requires_leaf_first(
+    api_client: TestClient, session: Session
+) -> None:
+    household, creator, _ = create_family(session)
+    parent = create_task(api_client, household.id, creator.id, "Host party")
+    child = create_task(
+        api_client,
+        household.id,
+        creator.id,
+        "Plan meal",
+        parent_task_id=parent["id"],
+    )
+    blocked = api_client.delete(
+        f"/households/{household.id}/tasks/{parent['id']}", headers=headers(creator.id)
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "Delete this Task's subtasks first"
+
+    recorded = api_client.post(
+        f"/households/{household.id}/completed-work",
+        headers=headers(creator.id),
+        json={
+            "description": "Planned the meal",
+            "category": "planning",
+            "participant_user_ids": [str(creator.id)],
+            "duration_override_minutes": 30,
+            "task_id": child["id"],
+        },
+    )
+    assert recorded.status_code == 201
+    completion_id = UUID(recorded.json()["completion_record_id"])
+
+    deleted = api_client.delete(
+        f"/households/{household.id}/tasks/{child['id']}", headers=headers(creator.id)
+    )
+    assert deleted.status_code == 204
+    session.expire_all()
+    completion = session.get(CompletionRecord, completion_id)
+    assert completion is not None
+    assert completion.task_id is None
 
 
 def test_task_management_is_isolated_between_households(

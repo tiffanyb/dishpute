@@ -38,10 +38,12 @@ async def test_mcp_exposes_client_neutral_household_tools() -> None:
         "schedule_task",
         "reschedule_time_block",
         "complete_task",
+        "delete_task",
     }
     assert tools["list_work_items"].annotations.readOnlyHint is True
     assert tools["get_calendar"].annotations.readOnlyHint is True
     assert tools["record_work"].annotations.readOnlyHint is False
+    assert tools["delete_task"].annotations.destructiveHint is True
 
 
 @pytest.mark.anyio

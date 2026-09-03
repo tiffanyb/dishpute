@@ -61,6 +61,7 @@ async function api(path, options = {}) {
     const body = await response.json().catch(() => ({}));
     throw new Error(formatApiError(body.detail, response.status));
   }
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -297,9 +298,26 @@ async function openTaskDetail(taskId) {
     $("#complete-task-button").classList.toggle("hidden", task.lifecycle_status !== "active");
     $("#cancel-task-button").classList.toggle("hidden", task.lifecycle_status !== "active");
     $("#reopen-task-button").classList.toggle("hidden", task.lifecycle_status === "active");
+    $("#delete-task-button").classList.toggle("hidden", task.created_by_user_id !== state.userId);
     $("#task-detail-error").classList.add("hidden");
     $("#task-detail-dialog").showModal();
   } catch (error) { showToast(error.message); }
+}
+
+async function deleteSelectedTask() {
+  const errorElement = $("#task-detail-error");
+  errorElement.classList.add("hidden");
+  try {
+    await api(`/households/${state.householdId}/tasks/${state.selectedTaskId}`, {
+      method: "DELETE",
+    });
+    $("#task-detail-dialog").close();
+    await loadAll();
+    showToast("Task deleted");
+  } catch (error) {
+    errorElement.textContent = error.message;
+    errorElement.classList.remove("hidden");
+  }
 }
 
 async function updateSelectedTaskLifecycle(lifecycleStatus) {
@@ -607,6 +625,11 @@ function bindEvents() {
   $("#reopen-task-button").addEventListener("click", () => updateSelectedTaskLifecycle("active"));
   $("#cancel-task-button").addEventListener("click", () => {
     if (window.confirm("Cancel this Task? Its history will be preserved.")) updateSelectedTaskLifecycle("cancelled");
+  });
+  $("#delete-task-button").addEventListener("click", () => {
+    if (window.confirm("Permanently delete this Task? Completed-work history will be preserved.")) {
+      deleteSelectedTask();
+    }
   });
   $("#reserve-time-button").addEventListener("click", openScheduleDialog);
   $("#close-schedule").addEventListener("click", () => $("#schedule-dialog").close());

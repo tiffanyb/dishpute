@@ -109,6 +109,8 @@ class DishputeApiClient:
             except ValueError:
                 detail = response.text
             raise DishputeApiError(f"Dishpute returned {response.status_code}: {detail}")
+        if response.status_code == 204:
+            return {}
         return response.json()
 
 
@@ -145,6 +147,12 @@ def build_mcp(
     write_tool = ToolAnnotations(
         readOnlyHint=False,
         destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    )
+    destructive_tool = ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=True,
         idempotentHint=False,
         openWorldHint=False,
     )
@@ -311,6 +319,16 @@ def build_mcp(
             write=True,
             json={"lifecycle_status": "completed"},
         )
+
+    @server.tool(annotations=destructive_tool, structured_output=True)
+    async def delete_task(task_id: UUID) -> dict[str, Any]:
+        """Permanently delete a Task created by the authenticated member."""
+        await client.request(
+            "DELETE",
+            f"/households/{client.active_household_id}/tasks/{task_id}",
+            write=True,
+        )
+        return {"deleted": True, "task_id": str(task_id)}
 
     return server
 

@@ -67,6 +67,7 @@ from dishpute.services import (
     ListedTimeBlock,
     TaskDetails,
     create_task,
+    delete_task,
     get_task_details,
     list_calendar_items,
     list_contributions,
@@ -482,6 +483,26 @@ def update_task_route(
         )
     response.headers["Idempotency-Replayed"] = str(replayed).lower()
     return result
+
+
+@app.delete(
+    "/households/{household_id}/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_task_route(
+    household_id: UUID,
+    task_id: UUID,
+    actor_user_id: ActorUserId,
+    session: DatabaseSession,
+) -> Response:
+    with _transaction(session):
+        delete_task(
+            session,
+            household_id=household_id,
+            actor_user_id=actor_user_id,
+            task_id=task_id,
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post(
