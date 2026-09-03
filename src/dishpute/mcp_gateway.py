@@ -10,6 +10,7 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.shared.auth import OAuthMetadata
 from mcp.types import ToolAnnotations
 from pydantic import AnyHttpUrl
 from starlette.requests import Request
@@ -359,17 +360,6 @@ def build_oauth_mcp() -> FastMCP:
         timezone_name="UTC",
     )
     host_with_port = urlparse(issuer_url).netloc
-    server = build_mcp(
-        client,
-        oauth_provider=provider,
-        auth_settings=auth_settings,
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=True,
-            allowed_hosts=[host_with_port, "127.0.0.1:8001", "localhost:8001"],
-            allowed_origins=[issuer_url],
-        ),
-    )
-
     def authorization_server_metadata() -> dict[str, Any]:
         return {
             "issuer": f"{issuer_url}/",
@@ -392,6 +382,29 @@ def build_oauth_mcp() -> FastMCP:
             ],
             "code_challenge_methods_supported": ["S256"],
         }
+
+    def build_complete_oauth_metadata(
+        _issuer_url: AnyHttpUrl,
+        _service_documentation_url: AnyHttpUrl | None,
+        _client_registration_options: ClientRegistrationOptions,
+        _revocation_options: RevocationOptions,
+    ) -> OAuthMetadata:
+        return OAuthMetadata.model_validate(authorization_server_metadata())
+
+    from mcp.server.auth import routes as auth_routes
+
+    auth_routes.build_metadata = build_complete_oauth_metadata
+
+    server = build_mcp(
+        client,
+        oauth_provider=provider,
+        auth_settings=auth_settings,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[host_with_port, "127.0.0.1:8001", "localhost:8001"],
+            allowed_origins=[issuer_url],
+        ),
+    )
 
     def protected_resource_metadata() -> dict[str, Any]:
         return {
