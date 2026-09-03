@@ -401,7 +401,9 @@ function openCompletedWorkDialog() {
 }
 
 function setCompletedWorkTimeMode(mode) {
-  $$("#completed-work-time-mode button").forEach((button) => button.classList.toggle("active", button.dataset.timeMode === mode));
+  $$('input[name="completed-work-time-mode"]').forEach((input) => {
+    input.checked = input.value === mode;
+  });
   $("#completed-work-duration-fields").classList.toggle("hidden", mode !== "duration");
   $("#completed-work-range-fields").classList.toggle("hidden", mode !== "range");
 }
@@ -413,7 +415,7 @@ async function createWork(event) {
   const durationEnd = $("#completed-work-end").value;
   const rangeEnd = $("#completed-work-range-end").value;
   const duration = $("#completed-work-duration").value;
-  const timeMode = $("#completed-work-time-mode button.active")?.dataset.timeMode || "duration";
+  const timeMode = $('input[name="completed-work-time-mode"]:checked')?.value || "duration";
   const title = $("#completed-work-title").value.trim();
   const note = $("#completed-work-note").value.trim();
   const description = [title, note].filter(Boolean).join("\n\n") || null;
@@ -693,8 +695,8 @@ function bindEvents() {
   $("#close-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
   $("#cancel-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
   $("#completed-work-form").addEventListener("submit", createWork);
-  $$("#completed-work-time-mode button").forEach((button) => {
-    button.addEventListener("click", () => setCompletedWorkTimeMode(button.dataset.timeMode));
+  $$('input[name="completed-work-time-mode"]').forEach((input) => {
+    input.addEventListener("change", () => setCompletedWorkTimeMode(input.value));
   });
   document.addEventListener("keydown", (event) => {
     if (event.shiftKey && event.key.toLowerCase() === "c" && !event.metaKey && !event.ctrlKey && !event.altKey) {

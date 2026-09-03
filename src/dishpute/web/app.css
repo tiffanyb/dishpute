@@ -167,7 +167,10 @@ dialog::backdrop { background: rgba(24,28,23,.38); backdrop-filter: blur(2px); }
 }
 .dialog-title-input:focus { outline: 0; border-color: transparent; }
 .dialog-title-input::placeholder { color: var(--ink); opacity: 1; }
-.time-mode { margin-top: 14px; width: max-content; }
+.time-mode { display: flex; width: max-content; margin-top: 14px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.time-mode label { margin: 0; padding: 8px 12px; border-radius: 4px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.time-mode label:has(input:checked) { background: var(--ink); color: white; }
+.time-mode input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; margin: 0; }
 dialog label { display: block; margin-top: 14px; color: var(--muted); font-size: 12px; font-weight: 700; }
 dialog input, dialog textarea, dialog select { width: 100%; margin-top: 7px; padding: 0 11px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; }
 dialog input, dialog select { height: 42px; }

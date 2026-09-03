@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260902.10" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260903.1" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260902.10" defer></script>
+    <script src="/assets/app.js?v=20260903.1" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -287,13 +287,13 @@
           <button class="icon-button" id="close-completed-work" type="button" title="Close"><i data-lucide="x"></i></button>
         </div>
         <label>Date<input id="completed-work-date" type="date" required /></label>
-        <div class="segmented-control time-mode" id="completed-work-time-mode" aria-label="Choose time entry mode">
-          <button class="active" data-time-mode="duration" type="button">Duration</button>
-          <button data-time-mode="range" type="button">Time range</button>
+        <div class="time-mode" id="completed-work-time-mode" aria-label="Choose time entry mode">
+          <label><input checked name="completed-work-time-mode" type="radio" value="duration" />Duration</label>
+          <label><input name="completed-work-time-mode" type="radio" value="range" />Time range</label>
         </div>
         <div class="form-grid" id="completed-work-duration-fields">
           <label>Duration <span class="optional-label">minutes</span><input id="completed-work-duration" type="number" min="1" /></label>
-          <label>End time<input id="completed-work-end" type="time" /></label>
+          <label>End time <span class="optional-label">now</span><input id="completed-work-end" type="time" /></label>
         </div>
         <div class="form-grid hidden" id="completed-work-range-fields">
           <label>Start time<input id="completed-work-start" type="time" /></label>

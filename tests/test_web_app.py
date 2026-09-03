@@ -21,12 +21,15 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Completed by" in page.text
     assert "Duration" in page.text
     assert "Time range" in page.text
+    assert 'name="completed-work-time-mode"' in page.text
+    assert ">now</span>" in page.text
     assert "Sign in to Dishpute" in page.text
     assert "auth-error" in page.text
     assert "Use at least 10 characters" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
-    assert "/assets/app.js?v=" in page.text
+    assert "/assets/app.css?v=20260903.1" in page.text
+    assert "/assets/app.js?v=20260903.1" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
     assert script.status_code == 200
