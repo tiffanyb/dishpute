@@ -18,6 +18,8 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Delete" in page.text
     assert "Reserve time" in page.text
     assert "Create Task" in page.text
+    assert "Co-op" in page.text
+    assert "Versus" in page.text
     assert "Type Task Title" in page.text
     assert "Completed by" in page.text
     assert "Duration" in page.text
@@ -29,10 +31,11 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "Use at least 10 characters" in page.text
     assert "Set up your household" in page.text
     assert "Create family invite" in page.text
-    assert "/assets/app.css?v=20260903.2" in page.text
-    assert "/assets/app.js?v=20260903.2" in page.text
+    assert "/assets/app.css?v=20260903.3" in page.text
+    assert "/assets/app.js?v=20260903.3" in page.text
     assert stylesheet.status_code == 200
     assert "calendar-grid" in stylesheet.text
+    assert 'body[data-theme="competitive"]' in stylesheet.text
     assert script.status_code == 200
     assert "calendar-items" in script.text
     assert "work-items" in script.text
@@ -47,4 +50,6 @@ def test_web_app_and_assets_are_served(api_client: TestClient) -> None:
     assert "scheduleSelectedTask" in script.text
     assert "createWork" in script.text
     assert "setCompletedWorkTimeMode" in script.text
+    assert "dishpute.theme" in script.text
+    assert "applyTheme" in script.text
     assert "event.shiftKey" in script.text

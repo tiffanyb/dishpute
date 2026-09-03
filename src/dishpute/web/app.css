@@ -23,6 +23,26 @@
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #f6f7f4; }
 button, input { font: inherit; }
 button { cursor: pointer; }
+body[data-theme="competitive"] {
+  --ink: #171717;
+  --muted: #504a5f;
+  --line: #171717;
+  --surface: #fff8d8;
+  --green: #ff2f8f;
+  --green-soft: #f8ff38;
+  --coral: #ff4a1f;
+  --coral-soft: #ffe2d7;
+  --gold: #ffb000;
+  --gold-soft: #fff061;
+  --blue: #00a8ff;
+  --blue-soft: #9ee8ff;
+  color: var(--ink);
+  background:
+    linear-gradient(90deg, rgba(23,23,23,.08) 1px, transparent 1px),
+    linear-gradient(rgba(23,23,23,.08) 1px, transparent 1px),
+    #45f0d8;
+  background-size: 24px 24px;
+}
 
 .app-header {
   height: 76px;
@@ -51,6 +71,7 @@ button { cursor: pointer; }
 .brand-lockup h1 { margin: 0; font-family: "DM Serif Display", serif; font-size: 25px; font-weight: 400; }
 .brand-lockup p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
 .header-actions { gap: 10px; }
+.theme-switch button { min-width: 58px; }
 .member-legend { display: flex; gap: 6px; margin-right: 6px; }
 .member-chip { gap: 6px; color: var(--muted); font-size: 12px; }
 .member-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--member-color); }
@@ -219,6 +240,97 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .task-lifecycle-actions { border-top: 1px solid var(--line); padding-top: 16px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 360px; padding: 12px 16px; background: var(--ink); color: white; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); font-size: 12px; z-index: 30; }
 
+body[data-theme="competitive"] .app-header {
+  border-bottom: 4px solid var(--ink);
+  background: #fff061;
+  backdrop-filter: none;
+  box-shadow: 0 8px 0 var(--ink);
+}
+body[data-theme="competitive"] .brand-mark,
+body[data-theme="competitive"] .primary-button,
+body[data-theme="competitive"] .segmented-control button.active,
+body[data-theme="competitive"] .time-mode label:has(input:checked),
+body[data-theme="competitive"] .calendar-day.today .day-header span {
+  background: var(--green);
+  color: white;
+}
+body[data-theme="competitive"] .brand-mark,
+body[data-theme="competitive"] .primary-button,
+body[data-theme="competitive"] .text-button,
+body[data-theme="competitive"] .button-group,
+body[data-theme="competitive"] .segmented-control,
+body[data-theme="competitive"] .time-mode,
+body[data-theme="competitive"] .calendar-grid,
+body[data-theme="competitive"] .task-list,
+body[data-theme="competitive"] .member-list,
+body[data-theme="competitive"] .invite-panel,
+body[data-theme="competitive"] dialog,
+body[data-theme="competitive"] dialog input,
+body[data-theme="competitive"] dialog textarea,
+body[data-theme="competitive"] dialog select,
+body[data-theme="competitive"] .participant-option {
+  border: 3px solid var(--ink);
+}
+body[data-theme="competitive"] .brand-mark,
+body[data-theme="competitive"] .primary-button,
+body[data-theme="competitive"] .calendar-grid,
+body[data-theme="competitive"] .task-list,
+body[data-theme="competitive"] .member-list,
+body[data-theme="competitive"] .invite-panel,
+body[data-theme="competitive"] dialog {
+  box-shadow: 8px 8px 0 var(--ink);
+}
+body[data-theme="competitive"] .brand-lockup h1,
+body[data-theme="competitive"] .view-toolbar h2,
+body[data-theme="competitive"] dialog h2,
+body[data-theme="competitive"] .empty-state h2,
+body[data-theme="competitive"] .dialog-title-input {
+  font-family: "DM Sans", sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+body[data-theme="competitive"] .section-kicker,
+body[data-theme="competitive"] .view-tab,
+body[data-theme="competitive"] dialog label,
+body[data-theme="competitive"] dialog legend,
+body[data-theme="competitive"] .task-title strong {
+  letter-spacing: 0;
+}
+body[data-theme="competitive"] .view-tabs { border-bottom: 4px solid var(--ink); }
+body[data-theme="competitive"] .view-tab.active::after { height: 6px; background: var(--coral); }
+body[data-theme="competitive"] .day-header { background: #f8ff38; border-bottom: 3px solid var(--ink); }
+body[data-theme="competitive"] .calendar-day { border-right: 3px solid var(--ink); }
+body[data-theme="competitive"] .calendar-item {
+  border: 3px solid var(--ink);
+  border-left: 9px solid var(--member-color);
+  background: #fff8d8;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+body[data-theme="competitive"] .calendar-item.completed { background: #b6ff6b; }
+body[data-theme="competitive"] .calendar-item.personal { background: #ffd166; }
+body[data-theme="competitive"] .task-row,
+body[data-theme="competitive"] .member-row,
+body[data-theme="competitive"] .detail-row {
+  border-bottom: 3px solid var(--ink);
+}
+body[data-theme="competitive"] .task-row:hover,
+body[data-theme="competitive"] .icon-button:hover,
+body[data-theme="competitive"] .text-button:hover {
+  background: var(--blue-soft);
+}
+body[data-theme="competitive"] .badge { background: var(--gold-soft); color: var(--ink); border: 2px solid var(--ink); }
+body[data-theme="competitive"] dialog::backdrop { background: rgba(0,0,0,.48); backdrop-filter: none; }
+body[data-theme="competitive"] dialog input:focus,
+body[data-theme="competitive"] dialog textarea:focus,
+body[data-theme="competitive"] dialog select:focus {
+  outline: 4px solid var(--blue);
+}
+body[data-theme="competitive"] .toast {
+  border: 3px solid var(--ink);
+  background: var(--green);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
 @media (max-width: 900px) {
   .app-header { padding: 0 18px; }
   main { padding: 0 18px 36px; }
@@ -235,6 +347,7 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 @media (max-width: 560px) {
   .app-header { height: 64px; }
   .brand-lockup p, #profile-name, #refresh-button { display: none; }
+  .theme-switch button { min-width: 0; }
   .profile-button { border-left: 0; padding-right: 0; }
   main { padding: 0 12px 28px; }
   .view-toolbar { align-items: flex-start; padding: 18px 0; min-height: 0; }

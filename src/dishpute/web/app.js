@@ -11,6 +11,7 @@ const state = {
   activeView: "calendar",
   taskFilter: "all",
   selectedTaskId: null,
+  theme: localStorage.getItem("dishpute.theme") || "cooperative",
 };
 
 const memberColors = ["#28644c", "#c9563f", "#426b8a", "#a77718", "#77578c"];
@@ -49,6 +50,15 @@ function colorForMember(id) {
 function participantNames(ids) {
   if (!ids?.length) return "Unplanned";
   return ids.map((id) => memberById(id)?.display_name || "Member").join(" + ");
+}
+
+function applyTheme(theme) {
+  state.theme = theme === "competitive" ? "competitive" : "cooperative";
+  document.body.dataset.theme = state.theme;
+  localStorage.setItem("dishpute.theme", state.theme);
+  $$("#theme-switch button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.themeChoice === state.theme);
+  });
 }
 
 async function api(path, options = {}) {
@@ -672,6 +682,9 @@ function bindEvents() {
     await navigator.clipboard.writeText($("#household-invite-code").textContent);
     showToast("Invitation code copied");
   });
+  $$("#theme-switch button").forEach((button) => {
+    button.addEventListener("click", () => applyTheme(button.dataset.themeChoice));
+  });
   $("#new-task-button").addEventListener("click", openTaskCreateDialog);
   $("#close-task-create").addEventListener("click", () => $("#task-create-dialog").close());
   $("#cancel-task-create").addEventListener("click", () => $("#task-create-dialog").close());
@@ -712,6 +725,7 @@ function bindEvents() {
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
+  applyTheme(state.theme);
   setAuthMode("login");
   if (window.lucide) window.lucide.createIcons();
   bootstrap();
