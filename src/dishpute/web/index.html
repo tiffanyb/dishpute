@@ -11,9 +11,9 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;900&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/assets/app.css?v=20260903.5" />
+    <link rel="stylesheet" href="/assets/app.css?v=20260903.6" />
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
-    <script src="/assets/app.js?v=20260903.5" defer></script>
+    <script src="/assets/app.js?v=20260903.6" defer></script>
   </head>
   <body>
     <header class="app-header">
@@ -23,13 +23,29 @@
           <h1>Dishpute</h1>
           <p id="household-label">Shared household time</p>
         </div>
+        <div class="theme-switch segmented-control" id="theme-switch" aria-label="Theme">
+          <button class="active" data-theme-choice="cooperative" type="button">
+            <svg class="theme-icon cooperation-icon" viewBox="0 0 32 24" aria-hidden="true">
+              <path d="M2 8 8 3l7 7-6 7-7-5Z" />
+              <path d="M30 8 24 3l-7 7 6 7 7-5Z" />
+              <path d="m10 11 5 5c1 1 2.6 1 3.6 0l3.4-3.4-5-5-3.2 3.2-2-1.8Z" />
+              <path d="m12 15 2.5 2.5M15 16.5l2 2M18 15.5l1.5 1.5" />
+            </svg>
+            Cooperation
+          </button>
+          <button data-theme-choice="competitive" type="button">
+            <svg class="theme-icon competition-icon" viewBox="0 0 36 24" aria-hidden="true">
+              <path class="glove-blue" d="M2 12c0-4.1 3.3-7.4 7.4-7.4H15c2.4 0 4.4 2 4.4 4.4v6c0 2.4-2 4.4-4.4 4.4H8.5C4.9 19.4 2 16.1 2 12Z" />
+              <path class="glove-red" d="M34 12c0-4.1-3.3-7.4-7.4-7.4H21c-2.4 0-4.4 2-4.4 4.4v6c0 2.4 2 4.4 4.4 4.4h6.5c3.6 0 6.5-3.3 6.5-7.4Z" />
+              <path class="glove-cuff" d="M3 8h4v8H3ZM29 8h4v8h-4Z" />
+              <path class="glove-spark" d="M17.2 8.5 16 11l2 .8-1.2 3.1 3.2-4-2.1-.8 1.1-2.6Z" />
+            </svg>
+            Competition
+          </button>
+        </div>
       </div>
       <div class="header-actions">
         <div class="member-legend" id="member-legend"></div>
-        <div class="theme-switch segmented-control" id="theme-switch" aria-label="Theme">
-          <button class="active" data-theme-choice="cooperative" type="button"><i data-lucide="handshake"></i>Cooperation</button>
-          <button data-theme-choice="competitive" type="button"><i data-lucide="hand-fist"></i>Competition</button>
-        </div>
         <button class="icon-button" id="refresh-button" type="button" title="Refresh">
           <i data-lucide="refresh-cw"></i>
         </button>
