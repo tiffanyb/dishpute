@@ -150,6 +150,7 @@ class TimeBlockUpdate(ApiModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     status: str | None = Field(default=None, pattern="^(planned|cancelled)$")
+    participant_user_ids: list[UUID] | None = None
 
     @model_validator(mode="after")
     def validate_changes(self) -> "TimeBlockUpdate":
@@ -201,6 +202,10 @@ class CompletedWorkCreate(ApiModel):
 
 class CompletedWorkUpdate(ApiModel):
     description: str | None = Field(default=None, min_length=1)
+    category: str | None = Field(default=None, min_length=1)
+    work_scope: Literal["household", "personal"] | None = None
+    counts_toward_fairness: bool | None = None
+    participant_user_ids: list[UUID] | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -210,6 +215,10 @@ class CompletedWorkUpdate(ApiModel):
             raise ValueError("at least one completed work field must be provided")
         if "description" in self.model_fields_set and self.description is None:
             raise ValueError("description cannot be null")
+        if "category" in self.model_fields_set and self.category is None:
+            raise ValueError("category cannot be null")
+        if "work_scope" in self.model_fields_set and self.work_scope is None:
+            raise ValueError("work_scope cannot be null")
         if (self.started_at is None) != (self.ended_at is None):
             raise ValueError("started_at and ended_at must be provided together")
         if (

@@ -12,6 +12,7 @@ const state = {
   taskFilter: "all",
   selectedTaskId: null,
   selectedCalendarItem: null,
+  editingCalendarItem: null,
   theme: localStorage.getItem("dishpute.theme") || "cooperative",
 };
 
@@ -316,65 +317,8 @@ function openItem(type, id) {
 async function editSelectedCalendarItem() {
   const item = state.selectedCalendarItem;
   if (!item) return;
-  const title = window.prompt("Task title", item.title || "Household time");
-  if (title === null) return;
-  const date = window.prompt("Date", dateInputValue(item.starts_at));
-  if (date === null) return;
-  const start = window.prompt("Start time", timeInputValue(item.starts_at));
-  if (start === null) return;
-  const end = window.prompt("End time", timeInputValue(item.ends_at));
-  if (end === null) return;
-  const startsAt = new Date(`${date}T${start}`);
-  const endsAt = new Date(`${date}T${end}`);
-  const errorElement = $("#item-detail-error");
-  if (!title.trim()) {
-    errorElement.textContent = "Enter a title.";
-    errorElement.classList.remove("hidden");
-    return;
-  }
-  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
-    errorElement.textContent = "Enter a valid time range.";
-    errorElement.classList.remove("hidden");
-    return;
-  }
-  errorElement.classList.add("hidden");
-  try {
-    if (item.item_type === "planned") {
-      if (item.task_ids?.[0]) {
-        await api(`/households/${state.householdId}/tasks/${item.task_ids[0]}`, {
-          method: "PATCH",
-          idempotentWrite: true,
-          body: JSON.stringify({ title: title.trim() }),
-        });
-      }
-      await api(`/households/${state.householdId}/time-blocks/${item.id}`, {
-        method: "PATCH",
-        idempotentWrite: true,
-        body: JSON.stringify({
-          title: title.trim(),
-          starts_at: startsAt.toISOString(),
-          ends_at: endsAt.toISOString(),
-        }),
-      });
-    } else if (item.completion_record_id) {
-      await api(`/households/${state.householdId}/completed-work/${item.completion_record_id}`, {
-        method: "PATCH",
-        idempotentWrite: true,
-        body: JSON.stringify({
-          description: title.trim(),
-          started_at: startsAt.toISOString(),
-          ended_at: endsAt.toISOString(),
-        }),
-      });
-    }
-    $("#item-dialog").close();
-    state.weekStart = startOfWeek(startsAt);
-    await loadAll();
-    showToast("Calendar item updated");
-  } catch (error) {
-    errorElement.textContent = error.message;
-    errorElement.classList.remove("hidden");
-  }
+  $("#item-dialog").close();
+  openCompletedWorkDialog(item);
 }
 
 async function removeSelectedCalendarItem() {
@@ -512,17 +456,28 @@ async function scheduleSelectedTask(event) {
   } finally { button.disabled = false; }
 }
 
-function openCompletedWorkDialog() {
+function openCompletedWorkDialog(item = null) {
   const now = new Date();
+  state.editingCalendarItem = item;
   $("#completed-work-form").reset();
-  $("#completed-work-date").value = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
-  $("#completed-work-end").value = [String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0")].join(":");
+  $("#completed-work-kicker").textContent = item ? "Edit Task" : "Task";
+  $("#save-completed-work").textContent = item ? "Save changes" : "Create Task";
+  $("#completed-work-title").value = item?.title || "";
+  $("#completed-work-date").value = item ? dateInputValue(item.starts_at) : dateInputValue(now);
+  $("#completed-work-start").value = item ? timeInputValue(item.starts_at) : "";
+  $("#completed-work-end").value = item ? timeInputValue(item.ends_at) : timeInputValue(now);
   $("#completed-work-range-end").value = $("#completed-work-end").value;
-  setCompletedWorkTimeMode("duration");
+  setCompletedWorkTimeMode(item ? "range" : "duration");
   $("#completed-work-participants").innerHTML = state.members.map((member) => `
-    <label class="participant-option"><input type="checkbox" value="${member.user_id}" ${member.user_id === state.userId ? "checked" : ""} />${escapeHtml(member.display_name)}</label>`).join("");
+    <label class="participant-option"><input type="checkbox" value="${member.user_id}" ${(item ? item.participant_user_ids.includes(member.user_id) : member.user_id === state.userId) ? "checked" : ""} />${escapeHtml(member.display_name)}</label>`).join("");
   const tasks = state.workItems.filter((item) => item.item_type === "task" && item.status === "active");
   $("#completed-work-task").innerHTML = '<option value="">None</option>' + tasks.map((task) => `<option value="${task.id}">${escapeHtml(task.title)}</option>`).join("");
+  $("#completed-work-category").value = item?.category || "other";
+  $("#completed-work-scope").value = item?.work_scope || "household";
+  if (item?.counts_toward_fairness === true) $("#completed-work-fairness").value = "include";
+  else if (item?.counts_toward_fairness === false) $("#completed-work-fairness").value = "exclude";
+  else $("#completed-work-fairness").value = "auto";
+  $("#completed-work-task").value = item?.task_ids?.[0] || "";
   $("#completed-work-error").classList.add("hidden");
   $("#completed-work-dialog").showModal();
   $("#completed-work-title").focus();
@@ -538,6 +493,7 @@ function setCompletedWorkTimeMode(mode) {
 
 async function createWork(event) {
   event.preventDefault();
+  const editingItem = state.editingCalendarItem;
   const date = $("#completed-work-date").value;
   const start = $("#completed-work-start").value;
   const durationEnd = $("#completed-work-end").value;
@@ -577,6 +533,11 @@ async function createWork(event) {
     errorElement.classList.remove("hidden");
     return;
   }
+  if (editingItem && !title) {
+    errorElement.textContent = "Enter a title.";
+    errorElement.classList.remove("hidden");
+    return;
+  }
   const participantIds = $$("#completed-work-participants input:checked").map((input) => input.value);
   if (!participantIds.length) {
     errorElement.textContent = "Choose at least one person under Completed by.";
@@ -589,7 +550,45 @@ async function createWork(event) {
   button.disabled = true;
   errorElement.classList.add("hidden");
   try {
-    if (isScheduled) {
+    if (editingItem?.item_type === "planned") {
+      if (editingItem.task_ids?.[0]) {
+        await api(`/households/${state.householdId}/tasks/${editingItem.task_ids[0]}`, {
+          method: "PATCH",
+          idempotentWrite: true,
+          body: JSON.stringify({
+            title,
+            description: note || null,
+            category: $("#completed-work-category").value,
+            work_scope: $("#completed-work-scope").value,
+            participant_user_ids: participantIds,
+          }),
+        });
+      }
+      await api(`/households/${state.householdId}/time-blocks/${editingItem.id}`, {
+        method: "PATCH",
+        idempotentWrite: true,
+        body: JSON.stringify({
+          title,
+          starts_at: startedAt.toISOString(),
+          ends_at: endedAt.toISOString(),
+          participant_user_ids: participantIds,
+        }),
+      });
+    } else if (editingItem?.item_type === "completed" && editingItem.completion_record_id) {
+      await api(`/households/${state.householdId}/completed-work/${editingItem.completion_record_id}`, {
+        method: "PATCH",
+        idempotentWrite: true,
+        body: JSON.stringify({
+          description,
+          category: $("#completed-work-category").value,
+          work_scope: $("#completed-work-scope").value,
+          counts_toward_fairness: fairness === "auto" ? editingItem.counts_toward_fairness : fairness === "include",
+          participant_user_ids: participantIds,
+          started_at: startedAt.toISOString(),
+          ended_at: endedAt.toISOString(),
+        }),
+      });
+    } else if (isScheduled) {
       await api(`/households/${state.householdId}/tasks`, {
         method: "POST", idempotentWrite: true,
         body: JSON.stringify({
@@ -620,13 +619,19 @@ async function createWork(event) {
       });
     }
     $("#completed-work-dialog").close();
+    state.editingCalendarItem = null;
     state.weekStart = startOfWeek(new Date(`${date}T12:00`));
     await loadAll();
-    showToast(isScheduled ? "Task scheduled" : "Work recorded");
+    showToast(editingItem ? "Calendar item updated" : (isScheduled ? "Task scheduled" : "Work recorded"));
   } catch (error) {
     errorElement.textContent = error.message;
     errorElement.classList.remove("hidden");
   } finally { button.disabled = false; }
+}
+
+function closeCompletedWorkDialog() {
+  state.editingCalendarItem = null;
+  $("#completed-work-dialog").close();
 }
 
 function showConnectionState() {
@@ -824,9 +829,9 @@ function bindEvents() {
   $("#close-schedule").addEventListener("click", () => $("#schedule-dialog").close());
   $("#cancel-schedule").addEventListener("click", () => $("#schedule-dialog").close());
   $("#schedule-form").addEventListener("submit", scheduleSelectedTask);
-  $("#record-work-button").addEventListener("click", openCompletedWorkDialog);
-  $("#close-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
-  $("#cancel-completed-work").addEventListener("click", () => $("#completed-work-dialog").close());
+  $("#record-work-button").addEventListener("click", () => openCompletedWorkDialog());
+  $("#close-completed-work").addEventListener("click", closeCompletedWorkDialog);
+  $("#cancel-completed-work").addEventListener("click", closeCompletedWorkDialog);
   $("#completed-work-form").addEventListener("submit", createWork);
   $$('input[name="completed-work-time-mode"]').forEach((input) => {
     input.addEventListener("change", () => setCompletedWorkTimeMode(input.value));

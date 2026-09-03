@@ -605,19 +605,50 @@ def update_planned_time_block(
     assert isinstance(starts_at, datetime) and isinstance(ends_at, datetime)
     if ends_at <= starts_at:
         raise ApplicationError("ends_at must be after starts_at")
+    participant_ids = None
+    if "participant_user_ids" in changes:
+        value = changes["participant_user_ids"]
+        assert isinstance(value, list)
+        participant_ids = _require_active_participants(session, household_id, value)
+        if not participant_ids:
+            raise ApplicationError("Time Block requires at least one participant")
 
     before_values = {
         field: getattr(time_block, field).isoformat()
         if isinstance(getattr(time_block, field), datetime)
         else getattr(time_block, field)
         for field in changes
+        if field != "participant_user_ids"
     }
+    if participant_ids is not None:
+        before_values["participant_user_ids"] = [
+            str(value) for value in _time_block_participant_ids(session, time_block.id)
+        ]
     for field, value in changes.items():
+        if field == "participant_user_ids":
+            continue
         setattr(time_block, field, value)
+    if participant_ids is not None:
+        session.execute(
+            delete(TimeBlockParticipant).where(
+                TimeBlockParticipant.time_block_id == time_block.id
+            )
+        )
+        for participant_id in participant_ids:
+            session.add(
+                TimeBlockParticipant(
+                    household_id=household_id,
+                    time_block_id=time_block.id,
+                    user_id=participant_id,
+                )
+            )
     after_values = {
         field: value.isoformat() if isinstance(value, datetime) else value
         for field, value in changes.items()
+        if field != "participant_user_ids"
     }
+    if participant_ids is not None:
+        after_values["participant_user_ids"] = [str(value) for value in participant_ids]
     _audit(
         session,
         household_id,
@@ -631,7 +662,7 @@ def update_planned_time_block(
     session.flush()
     return ListedTimeBlock(
         time_block=time_block,
-        participant_user_ids=_time_block_participant_ids(session, time_block.id),
+        participant_user_ids=participant_ids or _time_block_participant_ids(session, time_block.id),
     )
 
 
@@ -671,17 +702,37 @@ def update_completed_work(
         assert isinstance(starts_at, datetime) and isinstance(ends_at, datetime)
         if ends_at <= starts_at:
             raise ApplicationError("ended_at must be after started_at")
+    participant_ids = None
+    if "participant_user_ids" in changes:
+        value = changes["participant_user_ids"]
+        assert isinstance(value, list)
+        participant_ids = _require_active_participants(session, household_id, value)
+        if not participant_ids:
+            raise ApplicationError("Completed work requires at least one participant")
 
     before_values = {
         field: getattr(completion, field).isoformat()
         if isinstance(getattr(completion, field), datetime)
         else getattr(completion, field)
         for field in changes
+        if field != "participant_user_ids"
     }
+    if participant_ids is not None:
+        before_values["participant_user_ids"] = [
+            str(value) for value in _completion_participant_ids(session, completion.id)
+        ]
     if "description" in changes:
         completion.description = str(changes["description"]).strip()
         if time_block is not None:
             time_block.title = completion.description
+    if "category" in changes:
+        completion.category = str(changes["category"]).strip()
+    if "work_scope" in changes:
+        completion.work_scope = str(changes["work_scope"])
+        if time_block is not None:
+            time_block.work_scope = completion.work_scope
+    if "counts_toward_fairness" in changes:
+        completion.counts_toward_fairness = bool(changes["counts_toward_fairness"])
     if "started_at" in changes and "ended_at" in changes:
         assert isinstance(starts_at, datetime) and isinstance(ends_at, datetime)
         completion.started_at = starts_at
@@ -691,13 +742,44 @@ def update_completed_work(
         if time_block is not None:
             time_block.starts_at = starts_at
             time_block.ends_at = ends_at
+    if participant_ids is not None:
+        session.execute(
+            delete(CompletionRecordParticipant).where(
+                CompletionRecordParticipant.completion_record_id == completion.id
+            )
+        )
+        for participant_id in participant_ids:
+            session.add(
+                CompletionRecordParticipant(
+                    household_id=household_id,
+                    completion_record_id=completion.id,
+                    user_id=participant_id,
+                )
+            )
+        if time_block is not None:
+            session.execute(
+                delete(TimeBlockParticipant).where(
+                    TimeBlockParticipant.time_block_id == time_block.id
+                )
+            )
+            for participant_id in participant_ids:
+                session.add(
+                    TimeBlockParticipant(
+                        household_id=household_id,
+                        time_block_id=time_block.id,
+                        user_id=participant_id,
+                    )
+                )
 
     after_values = {
         field: getattr(completion, field).isoformat()
         if isinstance(getattr(completion, field), datetime)
         else getattr(completion, field)
         for field in changes
+        if field != "participant_user_ids"
     }
+    if participant_ids is not None:
+        after_values["participant_user_ids"] = [str(value) for value in participant_ids]
     _audit(
         session,
         household_id,
@@ -711,7 +793,7 @@ def update_completed_work(
     session.flush()
     return RecordedWork(
         completion=completion,
-        participant_user_ids=_completion_participant_ids(session, completion.id),
+        participant_user_ids=participant_ids or _completion_participant_ids(session, completion.id),
         time_block=time_block,
         effective_duration_minutes=completion.effective_duration_minutes,
     )
