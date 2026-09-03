@@ -283,23 +283,26 @@
           <div><p class="section-kicker">Completed</p><h2>Record work</h2></div>
           <button class="icon-button" id="close-completed-work" type="button" title="Close"><i data-lucide="x"></i></button>
         </div>
-        <label>What was done?<input id="completed-work-title" maxlength="300" required /></label>
+        <label>Note <span class="optional-label">optional</span><input id="completed-work-title" maxlength="300" placeholder="What was done?" /></label>
         <div class="form-grid">
           <label>Date<input id="completed-work-date" type="date" required /></label>
-          <label>Category
-            <select id="completed-work-category"><option value="other">Other</option><option value="cleaning">Cleaning</option><option value="cooking">Cooking</option><option value="laundry">Laundry</option><option value="shopping">Shopping</option><option value="planning">Planning</option></select>
-          </label>
+          <label>Duration <span class="optional-label">minutes</span><input id="completed-work-duration" type="number" min="1" /></label>
           <label>Start time<input id="completed-work-start" type="time" /></label>
           <label>End time<input id="completed-work-end" type="time" /></label>
         </div>
-        <label>Manual duration in minutes <span class="optional-label">optional override</span><input id="completed-work-duration" type="number" min="1" /></label>
-        <div class="form-grid">
-          <label>Scope<select id="completed-work-scope"><option value="household">Household</option><option value="personal">Personal</option></select></label>
-          <label>Fairness<select id="completed-work-fairness"><option value="auto">Automatic</option><option value="include">Include</option><option value="exclude">Do not include</option></select></label>
-        </div>
-        <label>Related task <span class="optional-label">optional</span><select id="completed-work-task"><option value="">None</option></select></label>
-        <label class="checkbox-row"><input id="completed-work-complete-task" type="checkbox" />Also mark the related Task completed</label>
         <fieldset><legend>Completed by</legend><div class="participant-options" id="completed-work-participants"></div></fieldset>
+        <details class="dialog-options">
+          <summary>Options</summary>
+          <div class="form-grid">
+            <label>Category
+              <select id="completed-work-category"><option value="other">Other</option><option value="cleaning">Cleaning</option><option value="cooking">Cooking</option><option value="laundry">Laundry</option><option value="shopping">Shopping</option><option value="planning">Planning</option></select>
+            </label>
+            <label>Scope<select id="completed-work-scope"><option value="household">Household</option><option value="personal">Personal</option></select></label>
+            <label>Fairness<select id="completed-work-fairness"><option value="auto">Automatic</option><option value="include">Include</option><option value="exclude">Do not include</option></select></label>
+            <label>Related task <span class="optional-label">optional</span><select id="completed-work-task"><option value="">None</option></select></label>
+          </div>
+          <label class="checkbox-row"><input id="completed-work-complete-task" type="checkbox" />Also mark the related Task completed</label>
+        </details>
         <p class="form-error hidden" id="completed-work-error" role="alert"></p>
         <div class="dialog-actions">
           <button class="text-button" id="cancel-completed-work" type="button">Cancel</button>

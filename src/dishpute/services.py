@@ -698,13 +698,14 @@ def record_completed_work(
         else resolved_work_scope == "household"
     )
     time_block = None
+    time_block_title = description or "Completed work"
     if started_at is not None and ended_at is not None:
         time_block = TimeBlock(
             household_id=household_id,
             created_by_user_id=actor_user_id,
             block_kind="actual",
             status="completed",
-            title=description,
+            title=time_block_title,
             work_scope=resolved_work_scope,
             starts_at=started_at,
             ends_at=ended_at,

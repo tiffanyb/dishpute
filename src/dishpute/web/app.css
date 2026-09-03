@@ -162,6 +162,9 @@ dialog legend { color: var(--muted); font-size: 12px; font-weight: 700; }
 .participant-option { display: flex; align-items: center; gap: 7px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font-weight: 500; }
 .participant-option input { width: 15px; height: 15px; margin: 0; }
 .optional-label { font-weight: 400; text-transform: none; }
+.dialog-options { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+.dialog-options summary { width: max-content; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.dialog-options[open] summary { margin-bottom: 2px; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 500; }
 .checkbox-row input { width: 16px; height: 16px; margin: 0; }
 .field-help { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 400; }

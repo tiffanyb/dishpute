@@ -77,6 +77,28 @@ def test_tiffany_records_kitchen_work_that_just_happened(
     assert contributions.json()[0]["user_id"] == str(tiffany.id)
 
 
+def test_completed_work_description_is_optional(
+    api_client: TestClient, session: Session
+) -> None:
+    household, tiffany, _ = create_family(session)
+
+    response = api_client.post(
+        f"/households/{household.id}/completed-work",
+        headers=actor_headers(tiffany.id),
+        json={
+            "category": "other",
+            "participant_user_ids": [str(tiffany.id)],
+            "started_at": "2026-09-05T10:00:00-07:00",
+            "ended_at": "2026-09-05T11:00:00-07:00",
+        },
+    )
+
+    assert response.status_code == 201
+    actual_block = session.scalar(select(TimeBlock))
+    assert actual_block is not None
+    assert actual_block.title == "Completed work"
+
+
 def test_husband_plans_future_kitchen_work(api_client: TestClient, session: Session) -> None:
     household, _, husband = create_family(session)
 
