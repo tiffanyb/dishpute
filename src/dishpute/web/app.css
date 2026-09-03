@@ -74,13 +74,16 @@ body[data-theme="competitive"] {
 .theme-switch { margin-left: 18px; }
 .theme-switch button { min-width: 142px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .theme-icon { width: 22px; height: 18px; flex: 0 0 auto; }
-.cooperation-icon path { fill: #f7b195; stroke: #171717; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.cooperation-icon path:nth-child(2) { fill: #5ca8e8; }
-.cooperation-icon path:nth-child(3) { fill: #d9895d; }
-.cooperation-icon path:nth-child(4) { fill: none; }
+.cooperation-icon { overflow: visible; }
+.cooperation-icon path { stroke: #171717; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.cooperation-icon .heart-blue { fill: #36a8ff; }
+.cooperation-icon .heart-pink { fill: #ff66b3; }
+.cooperation-icon .shake-pink { fill: #ff93c8; }
+.cooperation-icon .shake-blue { fill: #67c4ff; }
+.cooperation-icon .finger { fill: none; }
 .competition-icon path { stroke: #171717; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .competition-icon .glove-blue { fill: #2478ff; }
-.competition-icon .glove-red { fill: #ff3434; }
+.competition-icon .glove-red { fill: #ff3f9b; }
 .competition-icon .glove-cuff { fill: #fff8d8; }
 .competition-icon .glove-spark { fill: #fff061; }
 .member-legend { display: flex; gap: 6px; margin-right: 6px; }
